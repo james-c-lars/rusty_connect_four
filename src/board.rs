@@ -9,7 +9,7 @@ pub struct OutOfBounds;
 pub struct FullColumn;
 
 /// A connect four board
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Board {
     column_heights: [u8; if BOARD_WIDTH % 2 == 1 {
         BOARD_WIDTH / 2 + 1
