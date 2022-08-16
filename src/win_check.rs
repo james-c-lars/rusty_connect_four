@@ -1,5 +1,7 @@
-use crate::board::{Board, OutOfBounds};
-use crate::consts::NUMBER_TO_WIN;
+use crate::{
+    board::{Board, OutOfBounds},
+    consts::NUMBER_TO_WIN,
+};
 
 /// Returns whether the given color has won in the given board state
 pub fn has_color_won(board: &Board, color: bool) -> bool {

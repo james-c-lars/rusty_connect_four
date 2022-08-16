@@ -151,7 +151,10 @@ pub fn how_good_is(board: Board) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, heuristics::{score_circle_buffer, score_by_closeness_to_win}};
+    use crate::{
+        board::Board,
+        heuristics::{score_by_closeness_to_win, score_circle_buffer},
+    };
 
     use super::{CircleBuffer, OOB};
 
@@ -256,7 +259,7 @@ mod tests {
         ]);
 
         assert_eq!(score_by_closeness_to_win(board), 132);
-        
+
         let board = Board::from_arrays([
             [2, 2, 2, 1, 2, 2, 2],
             [1, 1, 1, 2, 1, 1, 1],

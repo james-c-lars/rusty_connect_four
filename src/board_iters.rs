@@ -1,7 +1,9 @@
 use std::cmp::{max, min};
 
-use crate::board::{Board, OutOfBounds};
-use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN};
+use crate::{
+    board::{Board, OutOfBounds},
+    consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN},
+};
 
 /// Iterates through a single horizontal strip of a board
 /// Acquired from a HorizontalStripIter
