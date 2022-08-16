@@ -125,17 +125,17 @@ fn score_by_closeness_to_win(board: Board) -> isize {
     }
 
     // Next we can calculate scores along the vertical strips
-    for iter in board.vertical_strip_iter() {
+    for iter in board.vertical_strip_iter(true) {
         score += score_circle_buffer(CircleBuffer::new(iter));
     }
 
     // Next we can calculate scores along the upward diagonal strips
-    for iter in board.upward_diagonal_strip_iter() {
+    for iter in board.upward_diagonal_strip_iter(true) {
         score += score_circle_buffer(CircleBuffer::new(iter));
     }
 
     // Next we can calculate scores along the downward diagonal strips
-    for iter in board.downward_diagonal_strip_iter() {
+    for iter in board.downward_diagonal_strip_iter(true) {
         score += score_circle_buffer(CircleBuffer::new(iter));
     }
 
@@ -151,7 +151,7 @@ pub fn how_good_is(board: Board) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{heuristics::score_circle_buffer, board::Board};
+    use crate::{board::Board, heuristics::score_circle_buffer};
 
     use super::{CircleBuffer, OOB};
 

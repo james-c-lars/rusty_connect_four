@@ -33,17 +33,17 @@ fn has_color_won_horizontally(board: &Board, color: bool) -> bool {
 
 /// Helper function to check for vertical connect fours
 fn has_color_won_vertically(board: &Board, color: bool) -> bool {
-    check_strips(board.vertical_strip_iter(), color)
+    check_strips(board.vertical_strip_iter(false), color)
 }
 
 /// Helper function to check for upward diagonal connect fours
 fn has_color_won_upward_diagonally(board: &Board, color: bool) -> bool {
-    check_strips(board.upward_diagonal_strip_iter(), color)
+    check_strips(board.upward_diagonal_strip_iter(false), color)
 }
 
 /// Helper function to check for downward diagonal connect fours
 fn has_color_won_downward_diagonally(board: &Board, color: bool) -> bool {
-    check_strips(board.downward_diagonal_strip_iter(), color)
+    check_strips(board.downward_diagonal_strip_iter(false), color)
 }
 
 /// Helper function to check a strip iterator for connect fours
