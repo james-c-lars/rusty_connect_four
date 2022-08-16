@@ -11,7 +11,7 @@ const SCALING_HEURISTIC: isize = 10;
 /// A circular buffer used to iterate through all sets of four pieces
 ///  in a given iterator.
 /// It automatically tracks how many of each piece type are within the
-///  buffer, and returns the piece_counts with each iteration of itself.
+///  buffer, and updates its piece_counts field accordingly.
 struct CircleBuffer<T>
 where
     T: Iterator<Item = Result<bool, OutOfBounds>>,
@@ -55,20 +55,9 @@ impl<T> Iterator for CircleBuffer<T>
 where
     T: Iterator<Item = Result<bool, OutOfBounds>>,
 {
-    type Item = [u32; 2];
+    type Item = ();
 
     fn next(&mut self) -> Option<Self::Item> {
-        // We can use the index being out of bounds as our cue to stop iteration
-        // This will happen when our internal iterator starts returning None
-        // This is done to ensure that CircleBuffer always iterates at least once
-        // We want to always be able to retrieve the first set of piece counts
-        //  even if the internal iterator has size < NUMBER_TO_WIN
-        if self.index >= NUMBER_TO_WIN as usize {
-            return None;
-        }
-
-        // TODO: Figure out some way to avoid needing to clone these values each time
-        let to_return = Some(self.piece_counts.clone());
         // If the iterator is still returning values, we can use it to update our internal
         //  buffer
         if let Some(piece) = self.iter.next() {
@@ -84,28 +73,36 @@ where
             // Now we can officially overwrite the old piece and increment the index
             self.buffer[self.index] = piece;
             self.index = (self.index + 1) % NUMBER_TO_WIN as usize;
-        } else {
-            // If the iterator is no longer returning values, we can signal that we should
-            //  stop further iteration
-            self.index = NUMBER_TO_WIN as usize;
-        }
 
-        to_return
+            Some(())
+        } else {
+            // If the iterator is no longer returning values, we can stop further iteration
+            None
+        }
     }
 }
 
-fn score_circle_buffer<T>(circle_buffer: CircleBuffer<T>) -> isize
+fn score_circle_buffer<T>(mut circle_buffer: CircleBuffer<T>) -> isize
 where
     T: Iterator<Item = Result<bool, OutOfBounds>>,
 {
     let mut score = 0;
-    for [false_pieces, true_pieces] in circle_buffer {
-        if false_pieces > 0 && true_pieces == 0 {
+
+    // This is essentially a do while loop
+    // It is structured this way so that it always iterates at least once
+    // This important for circle buffers with < NUMBER_TO_WIN iterators
+    loop {
+        let [false_pieces, true_pieces] = &circle_buffer.piece_counts;
+        if false_pieces > &0 && true_pieces == &0 {
             // If false has pieces that aren't blocked from a connect four via true
             score -= SCALING_HEURISTIC.pow(false_pieces - 1);
-        } else if true_pieces > 0 && false_pieces == 0 {
+        } else if true_pieces > &0 && false_pieces == &0 {
             // If true has pieces that aren't blocked from a connect four via false
             score += SCALING_HEURISTIC.pow(true_pieces - 1);
+        }
+
+        if None == circle_buffer.next() {
+            break;
         }
     }
 
@@ -163,19 +160,19 @@ mod tests {
         let iter = [].into_iter();
         let mut cb = CircleBuffer::new(iter);
 
-        assert_eq!(cb.next(), Some([0, 0]));
+        assert_eq!(&cb.piece_counts, &[0, 0]);
         assert_eq!(cb.next(), None);
 
         let iter = [Ok(true), OOB, Ok(false)].into_iter();
         let mut cb = CircleBuffer::new(iter);
 
-        assert_eq!(cb.next(), Some([1, 1]));
+        assert_eq!(&cb.piece_counts, &[1, 1]);
         assert_eq!(cb.next(), None);
 
         let iter = [Ok(true), Ok(true), OOB, OOB].into_iter();
         let mut cb = CircleBuffer::new(iter);
 
-        assert_eq!(cb.next(), Some([0, 2]));
+        assert_eq!(&cb.piece_counts, &[0, 2]);
         assert_eq!(cb.next(), None);
 
         let iter = [
@@ -196,16 +193,25 @@ mod tests {
         .into_iter();
         let mut cb = CircleBuffer::new(iter);
 
-        assert_eq!(cb.next(), Some([1, 1]));
-        assert_eq!(cb.next(), Some([2, 1]));
-        assert_eq!(cb.next(), Some([2, 0]));
-        assert_eq!(cb.next(), Some([3, 0]));
-        assert_eq!(cb.next(), Some([3, 0]));
-        assert_eq!(cb.next(), Some([2, 1]));
-        assert_eq!(cb.next(), Some([2, 1]));
-        assert_eq!(cb.next(), Some([1, 1]));
-        assert_eq!(cb.next(), Some([0, 1]));
-        assert_eq!(cb.next(), Some([0, 0]));
+        assert_eq!(&cb.piece_counts, &[1, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[2, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[2, 0]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[3, 0]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[3, 0]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[2, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[2, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[1, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[0, 1]);
+        assert_eq!(cb.next(), Some(()));
+        assert_eq!(&cb.piece_counts, &[0, 0]);
         assert_eq!(cb.next(), None);
     }
 
