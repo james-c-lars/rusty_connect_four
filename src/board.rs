@@ -8,29 +8,35 @@ pub struct OutOfBounds;
 #[derive(Debug, PartialEq, Eq)]
 pub struct FullColumn;
 
+/// A connect four board
 #[derive(Clone, Default)]
-struct Column {
-    height: u8,
-    piece_bitmap: u8,
+pub struct Board {
+    column_heights: [u8; if BOARD_WIDTH % 2 == 1 {
+        BOARD_WIDTH / 2 + 1
+    } else {
+        BOARD_WIDTH / 2
+    } as usize],
+    column_bitmaps: [u8; BOARD_WIDTH as usize],
 }
 
-impl Column {
-    /// Gets a boolean representation of a piece from a row in the column
+impl Board {
+    /// Gets a boolean representation of a piece given a column and row
     /// Fails if the row requested is out of bounds
-    fn get_piece(&self, row: u8) -> Result<bool, OutOfBounds> {
-        if row < self.height {
-            Ok((self.piece_bitmap & (1 << row)) != 0)
+    pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, OutOfBounds> {
+        if row < self.get_height(col) {
+            Ok((self.column_bitmaps[col as usize] & (1 << row)) != 0)
         } else {
             Err(OutOfBounds)
         }
     }
 
-    /// Drops a new piece on top of the column corresponding to the boolean
+    /// Drops a new piece on top of the given column corresponding to the boolean
     /// Fails if the column is already full
-    fn drop_piece(&mut self, color: bool) -> Result<(), FullColumn> {
-        if self.height < BOARD_HEIGHT {
-            self.piece_bitmap += (color as u8) << self.height;
-            self.height += 1;
+    pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), FullColumn> {
+        let col_height = self.get_height(col);
+        if col_height < BOARD_HEIGHT {
+            self.column_bitmaps[col as usize] += (color as u8) << col_height;
+            self.set_height(col, col_height + 1);
 
             Ok(())
         } else {
@@ -38,34 +44,30 @@ impl Column {
         }
     }
 
-    /// Returns the height of the pieces in the column
-    fn get_height(&self) -> u8 {
-        self.height
-    }
-}
-
-/// A connect four board
-#[derive(Clone, Default)]
-pub struct Board {
-    columns: [Column; BOARD_WIDTH as usize],
-}
-
-impl Board {
-    /// Gets a boolean representation of a piece given a column and row
-    /// Fails if the row requested is out of bounds
-    pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, OutOfBounds> {
-        Ok(self.columns[col as usize].get_piece(row)?)
-    }
-
-    /// Drops a new piece on top of the given column corresponding to the boolean
-    /// Fails if the column is already full
-    pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), FullColumn> {
-        Ok(self.columns[col as usize].drop_piece(color)?)
-    }
-
     /// Returns the height of the pieces in the given column
     pub fn get_height(&self, col: u8) -> u8 {
-        self.columns[col as usize].get_height()
+        let col_index = (col / 2) as usize;
+        let col_remainder = col % 2;
+
+        if col_remainder == 0 {
+            self.column_heights[col_index] & 0b1111
+        } else {
+            self.column_heights[col_index] >> 4
+        }
+    }
+
+    /// Sets the height of the given column
+    fn set_height(&mut self, col: u8, height: u8) {
+        let col_index = (col / 2) as usize;
+        let col_remainder = col % 2;
+
+        if col_remainder == 0 {
+            let remainder = self.column_heights[col_index] & 0b11110000;
+            self.column_heights[col_index] = remainder + (height & 0b1111);
+        } else {
+            let remainder = self.column_heights[col_index] & 0b00001111;
+            self.column_heights[col_index] = remainder + (height << 4);
+        }
     }
 
     /// Returns the height of the highest column
@@ -100,45 +102,9 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use crate::{
-        board::{Board, Column, FullColumn, OutOfBounds},
+        board::{Board, FullColumn, OutOfBounds},
         consts::{BOARD_HEIGHT, BOARD_WIDTH},
     };
-
-    #[test]
-    fn col_get_piece() {
-        let col = Column {
-            height: 4,
-            piece_bitmap: 0b1101,
-        };
-
-        assert_eq!(col.piece_bitmap, 13);
-        assert_eq!(col.get_piece(4), Err(OutOfBounds));
-        assert_eq!(col.get_piece(3), Ok(true));
-        assert_eq!(col.get_piece(2), Ok(true));
-        assert_eq!(col.get_piece(1), Ok(false));
-        assert_eq!(col.get_piece(0), Ok(true));
-    }
-
-    #[test]
-    fn col_drop_piece() {
-        let mut col = Column {
-            height: 4,
-            piece_bitmap: 0b1101,
-        };
-
-        for i in 5..=BOARD_HEIGHT {
-            let color = (i % 2) == 0;
-
-            assert_eq!(col.drop_piece(color), Ok(()));
-            assert_eq!(col.height, i);
-            assert_eq!(col.get_piece(i - 1), Ok(color));
-            assert_eq!(col.get_piece(i), Err(OutOfBounds));
-        }
-
-        assert_eq!(col.drop_piece(true), Err(FullColumn));
-        assert_eq!(col.height, BOARD_HEIGHT);
-        assert_eq!(col.get_piece(BOARD_HEIGHT), Err(OutOfBounds));
-    }
 
     #[test]
     fn from_arrays() {
@@ -181,6 +147,64 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn get_piece() {
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 2, 0, 0, 0, 2, 1],
+            [0, 1, 2, 0, 0, 1, 2],
+            [0, 1, 2, 0, 2, 1, 2],
+        ]);
+
+        assert_eq!(board.column_bitmaps[0], 0);
+        assert_eq!(board.get_piece(0, 5), Err(OutOfBounds));
+        assert_eq!(board.get_piece(0, 3), Err(OutOfBounds));
+        assert_eq!(board.get_piece(0, 2), Err(OutOfBounds));
+        assert_eq!(board.get_piece(0, 1), Err(OutOfBounds));
+        assert_eq!(board.get_piece(0, 0), Err(OutOfBounds));
+
+        assert_eq!(board.column_bitmaps[1], 4);
+        assert_eq!(board.get_piece(1, 5), Err(OutOfBounds));
+        assert_eq!(board.get_piece(1, 3), Err(OutOfBounds));
+        assert_eq!(board.get_piece(1, 2), Ok(true));
+        assert_eq!(board.get_piece(1, 1), Ok(false));
+        assert_eq!(board.get_piece(1, 0), Ok(false));
+
+        assert_eq!(board.column_bitmaps[6], 51);
+        assert_eq!(board.get_piece(6, 5), Ok(true));
+        assert_eq!(board.get_piece(6, 3), Ok(false));
+        assert_eq!(board.get_piece(6, 2), Ok(false));
+        assert_eq!(board.get_piece(6, 1), Ok(true));
+        assert_eq!(board.get_piece(6, 0), Ok(true));
+    }
+
+    #[test]
+    fn drop_piece() {
+        let mut board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 2, 0, 0, 0, 2, 1],
+            [0, 1, 2, 0, 0, 1, 2],
+            [0, 1, 2, 0, 2, 1, 2],
+        ]);
+
+        for i in 1..=BOARD_HEIGHT {
+            let color = (i % 2) == 0;
+
+            assert_eq!(board.drop_piece(3, color), Ok(()));
+            assert_eq!(board.get_height(3), i);
+            assert_eq!(board.get_piece(3, i - 1), Ok(color));
+            assert_eq!(board.get_piece(3, i), Err(OutOfBounds));
+        }
+
+        assert_eq!(board.drop_piece(3, true), Err(FullColumn));
+        assert_eq!(board.get_height(3), BOARD_HEIGHT);
+        assert_eq!(board.get_piece(3, BOARD_HEIGHT), Err(OutOfBounds));
     }
 
     #[test]
