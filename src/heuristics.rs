@@ -148,12 +148,9 @@ pub fn how_good_is(board: Board) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        board::Board,
-        heuristics::{score_by_closeness_to_win, score_circle_buffer},
-    };
+    use crate::{board::Board, heuristics::score_circle_buffer};
 
-    use super::{CircleBuffer, OOB};
+    use super::{score_by_closeness_to_win, CircleBuffer, OOB};
 
     #[test]
     fn circle_buffer() {
