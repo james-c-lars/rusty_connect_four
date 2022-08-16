@@ -1,11 +1,10 @@
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
-/// An error state for accessing a piece in a board
+/// An error state when accessing a board
+/// Either an out of bounds error if using get_piece
+/// Or a result of a column being full when drop_piece is called
 #[derive(Debug, PartialEq, Eq)]
-pub enum Error {
-    OutOfBounds,
-    FullColumn,
-}
+pub struct Error;
 
 #[derive(Clone, Default)]
 struct Column {
@@ -20,7 +19,7 @@ impl Column {
         if row < self.height {
             Ok((self.piece_bitmap & (1 << row)) != 0)
         } else {
-            Err(Error::OutOfBounds)
+            Err(Error)
         }
     }
 
@@ -33,7 +32,7 @@ impl Column {
 
             Ok(())
         } else {
-            Err(Error::FullColumn)
+            Err(Error)
         }
     }
 
@@ -111,7 +110,7 @@ mod tests {
         };
 
         assert_eq!(col.piece_bitmap, 13);
-        assert_eq!(col.get_piece(4), Err(Error::OutOfBounds));
+        assert_eq!(col.get_piece(4), Err(Error));
         assert_eq!(col.get_piece(3), Ok(true));
         assert_eq!(col.get_piece(2), Ok(true));
         assert_eq!(col.get_piece(1), Ok(false));
@@ -131,12 +130,12 @@ mod tests {
             assert_eq!(col.drop_piece(color), Ok(()));
             assert_eq!(col.height, i);
             assert_eq!(col.get_piece(i - 1), Ok(color));
-            assert_eq!(col.get_piece(i), Err(Error::OutOfBounds));
+            assert_eq!(col.get_piece(i), Err(Error));
         }
 
-        assert_eq!(col.drop_piece(true), Err(Error::FullColumn));
+        assert_eq!(col.drop_piece(true), Err(Error));
         assert_eq!(col.height, BOARD_HEIGHT);
-        assert_eq!(col.get_piece(BOARD_HEIGHT), Err(Error::OutOfBounds));
+        assert_eq!(col.get_piece(BOARD_HEIGHT), Err(Error));
     }
 
     #[test]
