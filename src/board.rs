@@ -1,10 +1,12 @@
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
-/// An error state when accessing a board
-/// Either an out of bounds error if using get_piece
-/// Or a result of a column being full when drop_piece is called
+/// An error state when accessing a nonexistant piece
 #[derive(Debug, PartialEq, Eq)]
-pub struct Error;
+pub struct OutOfBounds;
+
+/// An error state when dropping a piece in a full column
+#[derive(Debug, PartialEq, Eq)]
+pub struct FullColumn;
 
 #[derive(Clone, Default)]
 struct Column {
@@ -15,24 +17,24 @@ struct Column {
 impl Column {
     /// Gets a boolean representation of a piece from a row in the column
     /// Fails if the row requested is out of bounds
-    fn get_piece(&self, row: u8) -> Result<bool, Error> {
+    fn get_piece(&self, row: u8) -> Result<bool, OutOfBounds> {
         if row < self.height {
             Ok((self.piece_bitmap & (1 << row)) != 0)
         } else {
-            Err(Error)
+            Err(OutOfBounds)
         }
     }
 
     /// Drops a new piece on top of the column corresponding to the boolean
     /// Fails if the column is already full
-    fn drop_piece(&mut self, color: bool) -> Result<(), Error> {
+    fn drop_piece(&mut self, color: bool) -> Result<(), FullColumn> {
         if self.height < BOARD_HEIGHT {
             self.piece_bitmap += (color as u8) << self.height;
             self.height += 1;
 
             Ok(())
         } else {
-            Err(Error)
+            Err(FullColumn)
         }
     }
 
@@ -51,13 +53,13 @@ pub struct Board {
 impl Board {
     /// Gets a boolean representation of a piece given a column and row
     /// Fails if the row requested is out of bounds
-    pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, Error> {
+    pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, OutOfBounds> {
         Ok(self.columns[col as usize].get_piece(row)?)
     }
 
     /// Drops a new piece on top of the given column corresponding to the boolean
     /// Fails if the column is already full
-    pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), Error> {
+    pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), FullColumn> {
         Ok(self.columns[col as usize].drop_piece(color)?)
     }
 
@@ -98,7 +100,7 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use crate::{
-        board::{Board, Column, Error},
+        board::{Board, Column, FullColumn, OutOfBounds},
         consts::{BOARD_HEIGHT, BOARD_WIDTH},
     };
 
@@ -110,7 +112,7 @@ mod tests {
         };
 
         assert_eq!(col.piece_bitmap, 13);
-        assert_eq!(col.get_piece(4), Err(Error));
+        assert_eq!(col.get_piece(4), Err(OutOfBounds));
         assert_eq!(col.get_piece(3), Ok(true));
         assert_eq!(col.get_piece(2), Ok(true));
         assert_eq!(col.get_piece(1), Ok(false));
@@ -130,12 +132,12 @@ mod tests {
             assert_eq!(col.drop_piece(color), Ok(()));
             assert_eq!(col.height, i);
             assert_eq!(col.get_piece(i - 1), Ok(color));
-            assert_eq!(col.get_piece(i), Err(Error));
+            assert_eq!(col.get_piece(i), Err(OutOfBounds));
         }
 
-        assert_eq!(col.drop_piece(true), Err(Error));
+        assert_eq!(col.drop_piece(true), Err(FullColumn));
         assert_eq!(col.height, BOARD_HEIGHT);
-        assert_eq!(col.get_piece(BOARD_HEIGHT), Err(Error));
+        assert_eq!(col.get_piece(BOARD_HEIGHT), Err(OutOfBounds));
     }
 
     #[test]

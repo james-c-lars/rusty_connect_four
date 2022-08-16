@@ -1,4 +1,4 @@
-use crate::board::{Board, Error};
+use crate::board::{Board, OutOfBounds};
 use crate::consts::NUMBER_TO_WIN;
 
 /// Returns whether the given color has won in the given board state
@@ -50,7 +50,7 @@ fn has_color_won_downward_diagonally(board: &Board, color: bool) -> bool {
 fn check_strips<T, U>(mut strip_iter: T, color: bool) -> bool
 where
     T: Iterator<Item = U>,
-    U: ExactSizeIterator + Iterator<Item = Result<bool, Error>>,
+    U: ExactSizeIterator + Iterator<Item = Result<bool, OutOfBounds>>,
 {
     // We iterate through each strip of spaces in the board
     while let Some(mut strip) = strip_iter.next() {
@@ -79,7 +79,7 @@ where
 /// Helper function
 /// Increments in_a_row based on if the new piece matches the given color
 /// If it doesn't match, resets in_a_row to 0
-fn increment_if_matching(in_a_row: u8, piece: Result<bool, Error>, color: bool) -> u8 {
+fn increment_if_matching(in_a_row: u8, piece: Result<bool, OutOfBounds>, color: bool) -> u8 {
     match piece {
         Ok(piece) => {
             if piece == color {

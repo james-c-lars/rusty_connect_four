@@ -1,6 +1,6 @@
 use std::cmp::{max, min};
 
-use crate::board::{Board, Error};
+use crate::board::{Board, OutOfBounds};
 use crate::consts::{BOARD_WIDTH, NUMBER_TO_WIN};
 
 /// Iterates through a single horizontal strip of a board
@@ -12,7 +12,7 @@ pub struct HorizontalIter<'a> {
 }
 
 impl Iterator for HorizontalIter<'_> {
-    type Item = Result<bool, Error>;
+    type Item = Result<bool, OutOfBounds>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.col < BOARD_WIDTH {
@@ -69,7 +69,7 @@ pub struct VerticalIter<'a> {
 }
 
 impl Iterator for VerticalIter<'_> {
-    type Item = Result<bool, Error>;
+    type Item = Result<bool, OutOfBounds>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.row < self.max_height {
@@ -133,7 +133,7 @@ pub struct UpwardDiagonalIter<'a> {
 }
 
 impl Iterator for UpwardDiagonalIter<'_> {
-    type Item = Result<bool, Error>;
+    type Item = Result<bool, OutOfBounds>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.col < BOARD_WIDTH && self.row < self.max_height {
@@ -198,7 +198,7 @@ pub struct DownwardDiagonalIter<'a> {
 }
 
 impl Iterator for DownwardDiagonalIter<'_> {
-    type Item = Result<bool, Error>;
+    type Item = Result<bool, OutOfBounds>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.col is effectively one ahead of where it should really be
@@ -302,9 +302,9 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::{Board, Error};
+    use crate::board::{Board, OutOfBounds};
 
-    fn piece_to_num(piece: Result<bool, Error>) -> u8 {
+    fn piece_to_num(piece: Result<bool, OutOfBounds>) -> u8 {
         match piece {
             Ok(value) => value as u8 + 1,
             Err(_) => 0,
@@ -314,7 +314,7 @@ mod tests {
     fn super_collect<T, U>(iter: T) -> Vec<Vec<u8>>
     where
         T: Iterator<Item = U>,
-        U: Iterator<Item = Result<bool, Error>>,
+        U: Iterator<Item = Result<bool, OutOfBounds>>,
     {
         iter.map(|iter| iter.map(|p| piece_to_num(p)).collect())
             .collect()
