@@ -112,8 +112,11 @@ impl<'a> Iterator for VerticalStripIter<'a> {
                 return self.next();
             }
 
+            // If we do want full iterators, then we want to iterate until we're only getting
+            //  empty pieces and then stop
+            // If we don't want full iterators then we want to stop at the first empty piece
             if self.full {
-                col_height = min(col_height + NUMBER_TO_WIN, BOARD_HEIGHT);
+                col_height = min(col_height + NUMBER_TO_WIN - 1, BOARD_HEIGHT);
             }
 
             let result = Some(VerticalIter {
@@ -177,16 +180,9 @@ impl<'a> Iterator for UpwardDiagonalStripIter<'a> {
             return None;
         }
 
-        // Calculating the max_height that the new iterator should have
-        // This changes based on if we're creating full iterators or not
-        let mut strip_max_height = self.max_height;
-        if self.full {
-            strip_max_height = min(strip_max_height + NUMBER_TO_WIN, BOARD_HEIGHT);
-        }
-
         let result = Some(UpwardDiagonalIter {
             board: self.board,
-            max_height: strip_max_height,
+            max_height: self.max_height,
             col: self.col,
             row: self.row,
         });
@@ -260,16 +256,9 @@ impl<'a> Iterator for DownwardDiagonalStripIter<'a> {
             return None;
         }
 
-        // Calculating the max_height that the new iterator should have
-        // This changes based on if we're creating full iterators or not
-        let mut strip_max_height = self.max_height;
-        if self.full {
-            strip_max_height = min(strip_max_height + NUMBER_TO_WIN, BOARD_HEIGHT);
-        }
-
         let result = Some(DownwardDiagonalIter {
             board: self.board,
-            max_height: strip_max_height,
+            max_height: self.max_height,
             col: self.col,
             row: self.row,
         });
@@ -312,12 +301,24 @@ impl Board {
     /// full determines if iterators are created for strips of size < NUMBER_TO_WIN
     /// full also determines how early the iterator will halt
     pub fn upward_diagonal_strip_iter(&self, full: bool) -> UpwardDiagonalStripIter {
-        let max_height = self.get_max_height();
+        // Our max_height changes based on if we want full iterators that iterate
+        //  until only empty rows are being reached, or if we want non full iterators
+        //  that iterate until any empty rows are reached
+        // We don't need to care about the case with an empty board
+        let max_height = if full {
+            min(self.get_max_height() + NUMBER_TO_WIN - 1, BOARD_HEIGHT)
+        } else {
+            self.get_max_height()
+        };
+
+        // The row that we start iterating through strips at
+        let starting_row = max((max_height as i8) - (NUMBER_TO_WIN as i8), 0i8) as u8;
+
         UpwardDiagonalStripIter {
             board: self,
             max_height,
             col: 0,
-            row: max((max_height as i8) - (NUMBER_TO_WIN as i8), 0i8) as u8,
+            row: starting_row,
             full,
         }
     }
@@ -327,12 +328,24 @@ impl Board {
     /// full determines if iterators are created for strips of size < NUMBER_TO_WIN
     /// full also determines how early the iterator will halt
     pub fn downward_diagonal_strip_iter(&self, full: bool) -> DownwardDiagonalStripIter {
-        let max_height = self.get_max_height();
+        // Our max_height changes based on if we want full iterators that iterate
+        //  until only empty rows are being reached, or if we want non full iterators
+        //  that iterate until any empty rows are reached
+        // We don't need to care about the case with an empty board
+        let max_height = if full {
+            min(self.get_max_height() + NUMBER_TO_WIN - 1, BOARD_HEIGHT)
+        } else {
+            self.get_max_height()
+        };
+
+        // The row that we start iterating through strips at
+        let starting_row = max((max_height as i8) - (NUMBER_TO_WIN as i8), 0i8) as u8;
+
         DownwardDiagonalStripIter {
             board: self,
             max_height,
             col: BOARD_WIDTH,
-            row: max((max_height as i8) - (NUMBER_TO_WIN as i8), 0i8) as u8,
+            row: starting_row,
             full,
         }
     }
@@ -577,17 +590,243 @@ mod tests {
 
     #[test]
     fn vertical_strip_iter_full() {
-        todo!();
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+        ]);
+
+        let combined_strips = super_collect(board.vertical_strip_iter(true));
+
+        assert_eq!(combined_strips, Vec::<Vec::<u8>>::new());
+
+        let mut board = Board::from_arrays([
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.vertical_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 1, 1, 1, 1, 2],
+                vec![1, 2, 2, 0, 0, 0],
+                vec![2, 2, 2, 1, 0, 0],
+                vec![1, 0, 0, 0],
+                vec![2, 1, 0, 0, 0],
+                vec![2, 1, 2, 0, 0, 0],
+            ]
+        );
+
+        board.drop_piece(6, true).unwrap();
+
+        let combined_strips = super_collect(board.vertical_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 1, 1, 1, 1, 2],
+                vec![1, 2, 2, 0, 0, 0],
+                vec![2, 2, 2, 1, 0, 0],
+                vec![1, 0, 0, 0],
+                vec![2, 1, 0, 0, 0],
+                vec![2, 1, 2, 2, 0, 0],
+            ]
+        );
     }
 
     #[test]
     fn upward_diagonal_strip_iter_full() {
-        todo!();
+        let board = Board::from_arrays([
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.upward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 0, 0, 0],
+                vec![1, 2, 1, 0, 0],
+                vec![1, 2, 2, 0, 0, 0],
+                vec![1, 2, 0, 0, 0, 0],
+                vec![2, 0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.upward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 0, 0, 0],
+                vec![1, 2, 1, 0, 0],
+                vec![1, 2, 2, 0, 0, 0],
+                vec![1, 2, 0, 0, 0, 0],
+                vec![2, 0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.upward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 0, 0, 0],
+                vec![1, 2, 0, 0, 0],
+                vec![1, 2, 2, 0, 0, 0],
+                vec![1, 2, 0, 0, 0, 0],
+                vec![2, 0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.upward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![1, 0, 0, 0],
+                vec![1, 0, 0, 0],
+                vec![2, 0, 0, 0],
+                vec![0, 0, 0, 0],
+            ]
+        );
     }
 
     #[test]
     fn downward_diagonal_strip_iter_full() {
-        todo!();
+        let board = Board::from_arrays([
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.downward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![2, 0, 0, 0],
+                vec![1, 0, 0, 0, 0],
+                vec![2, 1, 0, 0, 0, 0],
+                vec![2, 0, 0, 1, 0, 2],
+                vec![1, 0, 2, 0, 1],
+                vec![0, 2, 2, 1],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.downward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![2, 0, 0, 0],
+                vec![1, 0, 0, 0, 0],
+                vec![2, 1, 0, 0, 0, 0],
+                vec![2, 0, 0, 1, 0, 0],
+                vec![1, 0, 2, 0, 1],
+                vec![0, 2, 2, 1],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.downward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![2, 0, 0, 0],
+                vec![1, 0, 0, 0, 0],
+                vec![2, 1, 0, 0, 0, 0],
+                vec![2, 0, 0, 0, 0, 0],
+                vec![1, 0, 2, 0, 0],
+                vec![0, 2, 2, 0],
+            ]
+        );
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let combined_strips = super_collect(board.downward_diagonal_strip_iter(true));
+
+        assert_eq!(
+            combined_strips,
+            vec![
+                vec![2, 0, 0, 0],
+                vec![2, 0, 0, 0],
+                vec![1, 0, 0, 0],
+                vec![0, 0, 0, 0],
+            ]
+        );
     }
 
     #[test]
@@ -723,10 +962,176 @@ mod tests {
             .map(|iter| iter.len())
             .collect();
         assert_eq!(downward_lens, Vec::<usize>::new());
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let horizontal_lens: Vec<usize> = board
+            .horizontal_strip_iter()
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(horizontal_lens, vec![7]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(false)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, Vec::<usize>::new());
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(false)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, Vec::<usize>::new());
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(false)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, Vec::<usize>::new());
     }
 
     #[test]
     fn iters_len_full() {
-        todo!();
+        let board = Board::from_arrays([
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, vec![6, 6, 6, 4, 5, 6]);
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, vec![6, 6, 6, 4, 5, 6]);
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, vec![6, 6, 6, 4, 5, 6]);
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 2, 2, 0, 0, 0, 2],
+            [1, 2, 2, 0, 0, 1, 1],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, vec![6, 6, 6, 4, 5, 6]);
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, vec![4, 5, 6, 6, 5, 4]);
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 1, 2, 0, 1, 2, 2],
+        ]);
+
+        let vertical_lens: Vec<usize> = board
+            .vertical_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(vertical_lens, vec![4, 4, 4, 4, 4, 4]);
+
+        let upward_lens: Vec<usize> = board
+            .upward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(upward_lens, vec![4, 4, 4, 4]);
+
+        let downward_lens: Vec<usize> = board
+            .downward_diagonal_strip_iter(true)
+            .map(|iter| iter.len())
+            .collect();
+        assert_eq!(downward_lens, vec![4, 4, 4, 4]);
     }
 }
