@@ -4,8 +4,6 @@ use crate::{
     win_check::has_color_won,
 };
 
-// TODO: Reduce the booleans into a single u8
-
 /// A BoardState represents a single state of a possible game.
 ///
 /// It has a board.
