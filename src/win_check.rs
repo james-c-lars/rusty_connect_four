@@ -79,7 +79,7 @@ where
 }
 
 /// Helper function for check_strips.
-/// 
+///
 /// Increments in_a_row based on if the new piece matches the given color.
 /// If it doesn't match, resets in_a_row to 0.
 fn increment_if_matching(in_a_row: u8, piece: Result<bool, OutOfBounds>, color: bool) -> u8 {

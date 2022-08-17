@@ -13,7 +13,7 @@ use crate::{
 ///  this one, its children.
 #[derive(Default, Debug)]
 pub struct BoardState {
-    board: Board,
+    pub board: Board,
     pub children: Vec<BoardState>,
     metadata: u8,
 }
@@ -27,7 +27,7 @@ impl BoardState {
 
         BoardState {
             board,
-            children: Vec::<BoardState>::new(),
+            children: Vec::new(),
             metadata,
         }
     }

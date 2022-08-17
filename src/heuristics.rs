@@ -5,7 +5,7 @@ use crate::{
 
 /// A circular buffer used to iterate through all sets of four pieces
 ///  in a given iterator.
-/// 
+///
 /// It automatically tracks how many of each piece type are within the
 ///  buffer, and updates its piece_counts field accordingly.
 struct CircleBuffer<T>
@@ -109,7 +109,7 @@ where
 
 /// This heuristic judges a board state by trying to determine who is closer
 ///  to a connect four.
-/// 
+///
 /// This is judged by finding how many X in a rows there are, with bigger Xs
 ///  leading to a higher score.
 fn score_by_closeness_to_win(board: Board) -> isize {
@@ -139,7 +139,7 @@ fn score_by_closeness_to_win(board: Board) -> isize {
 }
 
 /// Heuristically determines how good a given board state is.
-/// 
+///
 /// Positive values are favorable to true, negative to false.
 pub fn how_good_is(board: Board) -> isize {
     // TODO: Find a heuristic that doesn't multi count 2 1 1 1 0 0 0 for 1s

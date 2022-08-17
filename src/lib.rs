@@ -1,6 +1,7 @@
 pub mod board;
-pub mod board_iters;
+mod board_iters;
 pub mod board_state;
-pub mod consts;
+mod consts;
+pub mod generator;
 pub mod heuristics;
-pub mod win_check;
+mod win_check;

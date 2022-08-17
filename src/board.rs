@@ -21,7 +21,7 @@ pub struct Board {
 
 impl Board {
     /// Gets a boolean representation of a piece given a column and row.
-    /// 
+    ///
     /// Fails if the row requested is out of bounds.
     pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, OutOfBounds> {
         if row < self.get_height(col) {
@@ -32,7 +32,7 @@ impl Board {
     }
 
     /// Drops a new piece on top of the given column corresponding to the boolean.
-    /// 
+    ///
     /// Fails if the column is already full.
     pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), FullColumn> {
         let col_height = self.get_height(col);
@@ -81,7 +81,7 @@ impl Board {
     }
 
     /// Used to initialize a board based on a 2d array.
-    /// 
+    ///
     /// It's meant to be used in internal testing functions and can have unexpected outputs.
     pub fn from_arrays(arrays: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize]) -> Board {
         let mut board = Board::default();
