@@ -1,14 +1,14 @@
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
-/// An error state when accessing a nonexistant piece
+/// An error state when accessing a nonexistant piece.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct OutOfBounds;
 
-/// An error state when dropping a piece in a full column
+/// An error state when dropping a piece in a full column.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FullColumn;
 
-/// A connect four board
+/// A connect four board.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct Board {
     column_heights: [u8; if BOARD_WIDTH % 2 == 1 {
@@ -20,8 +20,9 @@ pub struct Board {
 }
 
 impl Board {
-    /// Gets a boolean representation of a piece given a column and row
-    /// Fails if the row requested is out of bounds
+    /// Gets a boolean representation of a piece given a column and row.
+    /// 
+    /// Fails if the row requested is out of bounds.
     pub fn get_piece(&self, col: u8, row: u8) -> Result<bool, OutOfBounds> {
         if row < self.get_height(col) {
             Ok((self.column_bitmaps[col as usize] & (1 << row)) != 0)
@@ -30,8 +31,9 @@ impl Board {
         }
     }
 
-    /// Drops a new piece on top of the given column corresponding to the boolean
-    /// Fails if the column is already full
+    /// Drops a new piece on top of the given column corresponding to the boolean.
+    /// 
+    /// Fails if the column is already full.
     pub fn drop_piece(&mut self, col: u8, color: bool) -> Result<(), FullColumn> {
         let col_height = self.get_height(col);
         if col_height < BOARD_HEIGHT {
@@ -44,7 +46,7 @@ impl Board {
         }
     }
 
-    /// Returns the height of the pieces in the given column
+    /// Returns the height of the pieces in the given column.
     pub fn get_height(&self, col: u8) -> u8 {
         let col_index = (col / 2) as usize;
         let col_remainder = col % 2;
@@ -56,7 +58,7 @@ impl Board {
         }
     }
 
-    /// Sets the height of the given column
+    /// Sets the height of the given column.
     fn set_height(&mut self, col: u8, height: u8) {
         let col_index = (col / 2) as usize;
         let col_remainder = col % 2;
@@ -70,7 +72,7 @@ impl Board {
         }
     }
 
-    /// Returns the height of the highest column
+    /// Returns the height of the highest column.
     pub fn get_max_height(&self) -> u8 {
         (0..BOARD_WIDTH)
             .map(|col| self.get_height(col))
@@ -78,8 +80,9 @@ impl Board {
             .unwrap()
     }
 
-    /// Used to initialize a board based on a 2d array
-    /// It's meant to be used in internal testing functions and can have unexpected outputs
+    /// Used to initialize a board based on a 2d array.
+    /// 
+    /// It's meant to be used in internal testing functions and can have unexpected outputs.
     pub fn from_arrays(arrays: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize]) -> Board {
         let mut board = Board::default();
 

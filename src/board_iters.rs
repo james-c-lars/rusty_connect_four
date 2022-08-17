@@ -5,8 +5,9 @@ use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN},
 };
 
-/// Iterates through a single horizontal strip of a board
-/// Acquired from a HorizontalStripIter
+/// Iterates through a single horizontal strip of a board.
+/// 
+/// Acquired from a HorizontalStripIter.
 pub struct HorizontalIter<'a> {
     board: &'a Board,
     col: u8,
@@ -34,8 +35,9 @@ impl ExactSizeIterator for HorizontalIter<'_> {
     }
 }
 
-/// Iterates through the different horizontal strips of a board
-/// Yields a HorizontalIter to each strip until the max_height of the board is reached
+/// Iterates through the different horizontal strips of a board.
+/// 
+/// Yields a HorizontalIter to each strip until the max_height of the board is reached.
 pub struct HorizontalStripIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -61,8 +63,9 @@ impl<'a> Iterator for HorizontalStripIter<'a> {
     }
 }
 
-/// Iterates through a single vertical strip of a board until the max_height of the board is reached
-/// Acquired from a VerticalStripIter
+/// Iterates through a single vertical strip of a board until the max_height of the board is reached.
+/// 
+/// Acquired from a VerticalStripIter.
 pub struct VerticalIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -91,8 +94,9 @@ impl ExactSizeIterator for VerticalIter<'_> {
     }
 }
 
-/// Iterates through the different vertical strips of a board
-/// Yields a VerticalIter for each strip, exlcuding empty columns
+/// Iterates through the different vertical strips of a board.
+/// 
+/// Yields a VerticalIter for each strip, exlcuding empty columns.
 pub struct VerticalStripIter<'a> {
     board: &'a Board,
     col: u8,
@@ -136,8 +140,9 @@ impl<'a> Iterator for VerticalStripIter<'a> {
     }
 }
 
-/// Iterates through a single upward diagonal strip of a board
-/// Acquired from a UpwardDiagonalStripIter
+/// Iterates through a single upward diagonal strip of a board.
+/// 
+/// Acquired from a UpwardDiagonalStripIter.
 pub struct UpwardDiagonalIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -161,8 +166,10 @@ impl Iterator for UpwardDiagonalIter<'_> {
     }
 }
 
-/// Iterates through the different upward diagonal strips of a board
-/// Yields a UpwardDiagonalIter to each strip of size >= NUMBER_TO_WIN until the max_height of the board is reached
+/// Iterates through the different upward diagonal strips of a board.
+/// 
+/// Yields a UpwardDiagonalIter to each strip of size >= NUMBER_TO_WIN until the max_height
+///  of the board is reached.
 pub struct UpwardDiagonalStripIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -205,8 +212,9 @@ impl ExactSizeIterator for UpwardDiagonalIter<'_> {
     }
 }
 
-/// Iterates through a single downward diagonal strip of a board
-/// Acquired from a DownwardDiagonalStripIter
+/// Iterates through a single downward diagonal strip of a board.
+/// 
+/// Acquired from a DownwardDiagonalStripIter.
 pub struct DownwardDiagonalIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -238,8 +246,10 @@ impl ExactSizeIterator for DownwardDiagonalIter<'_> {
     }
 }
 
-/// Iterates through the different downward diagonal strips of a board
-/// Yields a DownwardDiagonalIter to each strip of size >= NUMBER_TO_WIN until the max_height of the board is reached
+/// Iterates through the different downward diagonal strips of a board.
+/// 
+/// Yields a DownwardDiagonalIter to each strip of size >= NUMBER_TO_WIN until the max_height
+///  of the board is reached.
 pub struct DownwardDiagonalStripIter<'a> {
     board: &'a Board,
     max_height: u8,
@@ -276,8 +286,9 @@ impl<'a> Iterator for DownwardDiagonalStripIter<'a> {
 }
 
 impl Board {
-    /// Returns an iterator that yields an iterator to each horizontal strip of a board
-    /// Exits early at the max_height of the board
+    /// Returns an iterator that yields an iterator to each horizontal strip of a board.
+    /// 
+    /// Exits early at the max_height of the board.
     pub fn horizontal_strip_iter(&self) -> HorizontalStripIter {
         HorizontalStripIter {
             board: self,
@@ -286,10 +297,12 @@ impl Board {
         }
     }
 
-    /// Returns an iterator that yields an iterator to each vertical strip of a board
-    /// Each VerticalIter exits early at the max_height of the board
-    /// full determines if iterators are created for strips of size < NUMBER_TO_WIN
-    /// full also determines how early the iterator will halt
+    /// Returns an iterator that yields an iterator to each vertical strip of a board.
+    /// 
+    /// Each VerticalIter exits early at the max_height of the board.
+    /// 
+    /// `full` determines if iterators are created for strips of size < NUMBER_TO_WIN.
+    /// `full` also determines how early the iterator will halt.
     pub fn vertical_strip_iter(&self, full: bool) -> VerticalStripIter {
         VerticalStripIter {
             board: self,
@@ -298,10 +311,13 @@ impl Board {
         }
     }
 
-    /// Returns an iterator that yields an iterator to each upward diagonal strip of a board
-    /// Each UpwardDiagonalIter exits early at the max_height of the board and doesn't include strips less than size NUMBER_TO_WIN
-    /// full determines if iterators are created for strips of size < NUMBER_TO_WIN
-    /// full also determines how early the iterator will halt
+    /// Returns an iterator that yields an iterator to each upward diagonal strip of a board.
+    /// 
+    /// Each UpwardDiagonalIter exits early at the max_height of the board and doesn't include
+    ///  strips less than size NUMBER_TO_WIN.
+    /// 
+    /// `full` determines if iterators are created for strips of size < NUMBER_TO_WIN.
+    /// `full` also determines how early the iterator will halt.
     pub fn upward_diagonal_strip_iter(&self, full: bool) -> UpwardDiagonalStripIter {
         // Our max_height changes based on if we want full iterators that iterate
         //  until only empty rows are being reached, or if we want non full iterators
@@ -325,10 +341,13 @@ impl Board {
         }
     }
 
-    /// Returns an iterator that yields an iterator to each downward diagonal strip of a board
-    /// Each DownwardDiagonalIter exits early at the max_height of the board and doesn't include strips less than size NUMBER_TO_WIN
-    /// full determines if iterators are created for strips of size < NUMBER_TO_WIN
-    /// full also determines how early the iterator will halt
+    /// Returns an iterator that yields an iterator to each downward diagonal strip of a board.
+    /// 
+    /// Each DownwardDiagonalIter exits early at the max_height of the board and doesn't include
+    ///  strips less than size NUMBER_TO_WIN.
+    /// 
+    /// `full` determines if iterators are created for strips of size < NUMBER_TO_WIN.
+    /// `full` also determines how early the iterator will halt.
     pub fn downward_diagonal_strip_iter(&self, full: bool) -> DownwardDiagonalStripIter {
         // Our max_height changes based on if we want full iterators that iterate
         //  until only empty rows are being reached, or if we want non full iterators

@@ -3,7 +3,7 @@ use crate::{
     consts::NUMBER_TO_WIN,
 };
 
-/// Returns whether the given color has won in the given board state
+/// Returns whether the given color has won in the given board state.
 pub fn has_color_won(board: &Board, color: bool) -> bool {
     // Figuring out what row the highest piece is in
     // Can prevent iterating through empty rows
@@ -28,27 +28,27 @@ pub fn has_color_won(board: &Board, color: bool) -> bool {
     false
 }
 
-/// Helper function to check for horizontal connect fours
+/// Helper function to check for horizontal connect fours.
 fn has_color_won_horizontally(board: &Board, color: bool) -> bool {
     check_strips(board.horizontal_strip_iter(), color)
 }
 
-/// Helper function to check for vertical connect fours
+/// Helper function to check for vertical connect fours.
 fn has_color_won_vertically(board: &Board, color: bool) -> bool {
     check_strips(board.vertical_strip_iter(false), color)
 }
 
-/// Helper function to check for upward diagonal connect fours
+/// Helper function to check for upward diagonal connect fours.
 fn has_color_won_upward_diagonally(board: &Board, color: bool) -> bool {
     check_strips(board.upward_diagonal_strip_iter(false), color)
 }
 
-/// Helper function to check for downward diagonal connect fours
+/// Helper function to check for downward diagonal connect fours.
 fn has_color_won_downward_diagonally(board: &Board, color: bool) -> bool {
     check_strips(board.downward_diagonal_strip_iter(false), color)
 }
 
-/// Helper function to check a strip iterator for connect fours
+/// Helper function to check a strip iterator for connect fours.
 fn check_strips<T, U>(mut strip_iter: T, color: bool) -> bool
 where
     T: Iterator<Item = U>,
@@ -78,9 +78,10 @@ where
     false
 }
 
-/// Helper function
-/// Increments in_a_row based on if the new piece matches the given color
-/// If it doesn't match, resets in_a_row to 0
+/// Helper function for check_strips.
+/// 
+/// Increments in_a_row based on if the new piece matches the given color.
+/// If it doesn't match, resets in_a_row to 0.
 fn increment_if_matching(in_a_row: u8, piece: Result<bool, OutOfBounds>, color: bool) -> u8 {
     match piece {
         Ok(piece) => {

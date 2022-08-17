@@ -19,7 +19,7 @@ pub struct BoardState {
 }
 
 impl BoardState {
-    /// Constructs a new BoardState
+    /// Constructs a new BoardState.
     fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
         let game_over = has_color_won(&board, !turn);
 
@@ -32,7 +32,7 @@ impl BoardState {
         }
     }
 
-    /// Populates the children vector with new BoardStates
+    /// Populates the children vector with new BoardStates.
     pub fn generate_children(&mut self) -> &mut Vec<BoardState> {
         // If this BoardState has an already won game, no children are generated
         if let Some(_) = self.is_game_over() {
@@ -60,7 +60,7 @@ impl BoardState {
         &mut self.children
     }
 
-    /// Used to return the child BoardState corresponding to a particular move
+    /// Used to return the child BoardState corresponding to a particular move.
     pub fn narrow_possibilities(self, col: u8) -> BoardState {
         for child in self.children {
             if child.get_last_move() == col {
@@ -74,12 +74,12 @@ impl BoardState {
         );
     }
 
-    /// Returns whose turn it is
+    /// Returns whose turn it is.
     fn get_turn(&self) -> bool {
         (self.metadata & 0b0000_0001) == 1
     }
 
-    /// Returns if the game is over and who won if it is
+    /// Returns if the game is over and who won if it is.
     pub fn is_game_over(&self) -> Option<bool> {
         if (self.metadata & 0b0000_0010) == 2 {
             Some(!self.get_turn())
@@ -88,7 +88,7 @@ impl BoardState {
         }
     }
 
-    /// Returns what column the last piece was dropped in
+    /// Returns what column the last piece was dropped in.
     pub fn get_last_move(&self) -> u8 {
         self.metadata >> 4
     }
