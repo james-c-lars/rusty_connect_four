@@ -11,11 +11,7 @@ pub struct FullColumn;
 /// A connect four board.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct Board {
-    column_heights: [u8; if BOARD_WIDTH % 2 == 1 {
-        BOARD_WIDTH / 2 + 1
-    } else {
-        BOARD_WIDTH / 2
-    } as usize],
+    column_heights: [u8; BOARD_WIDTH as usize],
     column_bitmaps: [u8; BOARD_WIDTH as usize],
 }
 
@@ -48,28 +44,12 @@ impl Board {
 
     /// Returns the height of the pieces in the given column.
     pub fn get_height(&self, col: u8) -> u8 {
-        let col_index = (col / 2) as usize;
-        let col_remainder = col % 2;
-
-        if col_remainder == 0 {
-            self.column_heights[col_index] & 0b1111
-        } else {
-            self.column_heights[col_index] >> 4
-        }
+        self.column_heights[col as usize]
     }
 
     /// Sets the height of the given column.
     fn set_height(&mut self, col: u8, height: u8) {
-        let col_index = (col / 2) as usize;
-        let col_remainder = col % 2;
-
-        if col_remainder == 0 {
-            let remainder = self.column_heights[col_index] & 0b1111_0000;
-            self.column_heights[col_index] = remainder + (height & 0b0000_1111);
-        } else {
-            let remainder = self.column_heights[col_index] & 0b0000_1111;
-            self.column_heights[col_index] = remainder + (height << 4);
-        }
+        self.column_heights[col as usize] = height;
     }
 
     /// Returns the height of the highest column.

@@ -15,6 +15,7 @@ use crate::{
 pub struct BoardState {
     pub board: Board,
     pub children: Vec<BoardState>,
+    last_move: u8,
     metadata: u8,
 }
 
@@ -23,11 +24,12 @@ impl BoardState {
     fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
         let game_over = has_color_won(&board, !turn);
 
-        let metadata = (turn as u8) + ((game_over as u8) << 1) + (last_move << 4);
+        let metadata = (turn as u8) + ((game_over as u8) << 4);
 
         BoardState {
             board,
             children: Vec::new(),
+            last_move,
             metadata,
         }
     }
@@ -76,12 +78,12 @@ impl BoardState {
 
     /// Returns whose turn it is.
     fn get_turn(&self) -> bool {
-        (self.metadata & 0b0000_0001) == 1
+        self.metadata % 2 == 1
     }
 
     /// Returns if the game is over and who won if it is.
     pub fn is_game_over(&self) -> Option<bool> {
-        if (self.metadata & 0b0000_0010) == 2 {
+        if self.metadata > 4 {
             Some(!self.get_turn())
         } else {
             None
@@ -90,7 +92,7 @@ impl BoardState {
 
     /// Returns what column the last piece was dropped in.
     pub fn get_last_move(&self) -> u8 {
-        self.metadata >> 4
+        self.last_move
     }
 }
 
