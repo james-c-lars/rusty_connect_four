@@ -1,11 +1,11 @@
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
 /// An error state when accessing a nonexistant piece
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct OutOfBounds;
 
 /// An error state when dropping a piece in a full column
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FullColumn;
 
 /// A connect four board
@@ -62,10 +62,10 @@ impl Board {
         let col_remainder = col % 2;
 
         if col_remainder == 0 {
-            let remainder = self.column_heights[col_index] & 0b11110000;
-            self.column_heights[col_index] = remainder + (height & 0b1111);
+            let remainder = self.column_heights[col_index] & 0b1111_0000;
+            self.column_heights[col_index] = remainder + (height & 0b0000_1111);
         } else {
-            let remainder = self.column_heights[col_index] & 0b00001111;
+            let remainder = self.column_heights[col_index] & 0b0000_1111;
             self.column_heights[col_index] = remainder + (height << 4);
         }
     }

@@ -1,12 +1,7 @@
 use crate::{
     board::{Board, OutOfBounds},
-    consts::NUMBER_TO_WIN,
+    consts::{NUMBER_TO_WIN, SCALING_HEURISTIC},
 };
-
-const OOB: Result<bool, OutOfBounds> = Err(OutOfBounds);
-
-/// Used to define how much better an X in a row is to a X-1 in a row
-const SCALING_HEURISTIC: isize = 10;
 
 /// A circular buffer used to iterate through all sets of four pieces
 ///  in a given iterator.
@@ -28,14 +23,14 @@ where
 {
     /// Creates a CircleBuffer using a board iterator
     fn new(mut iter: T) -> CircleBuffer<T> {
-        let mut buffer = [OOB; NUMBER_TO_WIN as usize];
+        let mut buffer = [Err(OutOfBounds); NUMBER_TO_WIN as usize];
         let mut piece_counts = [0; 2];
 
         // Initializing the buffer
         // We leave off the last entry, which will be filled when we call next for the first time
         for i in 0..NUMBER_TO_WIN as usize {
             // If the iterator is less than
-            let piece = iter.next().unwrap_or(OOB);
+            let piece = iter.next().unwrap_or(Err(OutOfBounds));
             if let Ok(value) = piece {
                 piece_counts[value as usize] += 1;
             }
@@ -148,9 +143,14 @@ pub fn how_good_is(board: Board) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, heuristics::score_circle_buffer};
+    use crate::{
+        board::{Board, OutOfBounds},
+        heuristics::score_circle_buffer,
+    };
 
-    use super::{score_by_closeness_to_win, CircleBuffer, OOB};
+    use super::{score_by_closeness_to_win, CircleBuffer};
+
+    const OOB: Result<bool, OutOfBounds> = Err(OutOfBounds);
 
     #[test]
     fn circle_buffer() {
