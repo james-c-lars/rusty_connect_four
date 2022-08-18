@@ -1,4 +1,4 @@
-use crate::{board_state::BoardState, consts::BOARD_WIDTH};
+use crate::board_state::BoardState;
 
 /// Iterator used to generate a BoardState decision tree.
 ///
@@ -115,15 +115,8 @@ impl BoardState {
         // First we need to make sure there's even a node in each generation to compare
         if false_layer.len() > 0 && true_layer.len() > 0 {
             // Then we can calculate the depth
-            let arbitrary_false = &false_layer[0];
-            let false_depth: u8 = (0..BOARD_WIDTH)
-                .map(|col| arbitrary_false.board.get_height(col))
-                .sum();
-
-            let arbitrary_true = &true_layer[0];
-            let true_depth: u8 = (0..BOARD_WIDTH)
-                .map(|col| arbitrary_true.board.get_height(col))
-                .sum();
+            let false_depth = false_layer[0].get_depth();
+            let true_depth = true_layer[0].get_depth();
 
             if false_depth < true_depth {
                 (false_layer, true_layer)
@@ -165,14 +158,7 @@ mod tests {
             layer_generator.get_new_generation().len(),
             BOARD_WIDTH as usize
         );
-        assert_eq!(layer_generator.next(), None);
-
-        let second_generation = layer_generator.get_new_generation();
-
-        let mut layer_generator = LayerGenerator {
-            previous_generation: second_generation,
-            new_generation: Vec::new(),
-        };
+        assert_eq!(layer_generator.get_previous_generation().len(), 0);
 
         for i in 0..BOARD_WIDTH {
             assert_eq!(layer_generator.next(), Some(()));
@@ -180,8 +166,11 @@ mod tests {
                 layer_generator.get_new_generation().len(),
                 (BOARD_WIDTH * (i + 1)) as usize
             );
+            assert_eq!(
+                layer_generator.get_previous_generation().len(),
+                (BOARD_WIDTH - i - 1) as usize
+            );
         }
-        assert_eq!(layer_generator.next(), None);
 
         let last_board = Board::from_arrays([
             [0, 0, 0, 0, 0, 0, 0],
@@ -193,6 +182,21 @@ mod tests {
         ]);
 
         assert_eq!(board_state.children[6].children[6].board, last_board);
+
+        let mut board_state = BoardState::default();
+        let first_generation = vec![&mut board_state];
+
+        let mut layer_generator = LayerGenerator {
+            generation_1: first_generation,
+            generation_2: Vec::new(),
+            generation_1_is_new: false,
+        };
+
+        for _ in 0..10_000 {
+            layer_generator.next();
+        }
+
+        assert_eq!(layer_generator.next(), Some(()));
     }
 
     #[test]
@@ -205,12 +209,13 @@ mod tests {
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
-            previous_generation: previous,
-            new_generation: new,
+            generation_1: previous,
+            generation_2: new,
+            generation_1_is_new: false,
         };
         layer_generator.next();
 
-        assert_eq!(layer_generator.previous_generation.len(), 0);
+        assert_eq!(layer_generator.get_previous_generation().len(), 0);
         assert_eq!(layer_generator.get_new_generation().len(), 7);
 
         let (previous, new) = board_state.get_bottom_two_layers();
@@ -219,12 +224,15 @@ mod tests {
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
-            previous_generation: previous,
-            new_generation: new,
+            generation_1: previous,
+            generation_2: new,
+            generation_1_is_new: false,
         };
-        while let Some(_) = layer_generator.next() {}
+        for _ in 0..7 {
+            layer_generator.next();
+        }
 
-        assert_eq!(layer_generator.previous_generation.len(), 0);
+        assert_eq!(layer_generator.get_previous_generation().len(), 0);
         assert_eq!(layer_generator.get_new_generation().len(), 49);
 
         let (previous, new) = board_state.get_bottom_two_layers();
@@ -233,14 +241,15 @@ mod tests {
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
-            previous_generation: previous,
-            new_generation: new,
+            generation_1: previous,
+            generation_2: new,
+            generation_1_is_new: false,
         };
         for _ in 0..4 {
             layer_generator.next();
         }
 
-        assert_eq!(layer_generator.previous_generation.len(), 45);
+        assert_eq!(layer_generator.get_previous_generation().len(), 45);
         assert_eq!(layer_generator.get_new_generation().len(), 28);
 
         let (previous, new) = board_state.get_bottom_two_layers();
@@ -249,19 +258,41 @@ mod tests {
         assert_eq!(new.len(), 28);
 
         let mut layer_generator = LayerGenerator {
-            previous_generation: previous,
-            new_generation: new,
+            generation_1: previous,
+            generation_2: new,
+            generation_1_is_new: false,
         };
         for _ in 0..4 {
             layer_generator.next();
         }
 
-        assert_eq!(layer_generator.previous_generation.len(), 41);
+        assert_eq!(layer_generator.get_previous_generation().len(), 41);
         assert_eq!(layer_generator.get_new_generation().len(), 56);
 
         let (previous, new) = board_state.get_bottom_two_layers();
 
         assert_eq!(previous.len(), 41);
         assert_eq!(new.len(), 56);
+
+        let mut layer_generator = LayerGenerator {
+            generation_1: previous,
+            generation_2: new,
+            generation_1_is_new: false,
+        };
+        for _ in 0..100_000 {
+            layer_generator.next();
+        }
+
+        let previous_depth = layer_generator.get_previous_generation()[0].get_depth();
+        for previous_state in layer_generator.get_previous_generation().iter() {
+            assert_eq!(previous_state.get_depth(), previous_depth);
+        }
+
+        let new_depth = layer_generator.get_new_generation()[0].get_depth();
+        for new_state in layer_generator.get_new_generation().iter() {
+            assert_eq!(new_state.get_depth(), new_depth);
+        }
+
+        assert_eq!(previous_depth + 1, new_depth);
     }
 }

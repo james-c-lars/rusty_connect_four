@@ -94,6 +94,11 @@ impl BoardState {
     pub fn get_last_move(&self) -> u8 {
         self.last_move
     }
+
+    /// Returns how many moves into the game this board state is
+    pub fn get_depth(&self) -> u8 {
+        (0..BOARD_WIDTH).map(|col| self.board.get_height(col)).sum()
+    }
 }
 
 #[cfg(test)]
@@ -248,5 +253,15 @@ mod tests {
         board_state.generate_children();
 
         board_state.narrow_possibilities(6);
+    }
+
+    #[test]
+    fn get_depth() {
+        let mut board_state = BoardState::new(Board::default(), false, 0);
+
+        for i in 0..21 {
+            assert_eq!(i, board_state.get_depth());
+            board_state.board.drop_piece(i % 7, (i % 2) == 0).unwrap();
+        }
     }
 }
