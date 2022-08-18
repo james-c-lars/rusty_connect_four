@@ -21,7 +21,7 @@ pub struct BoardState {
 
 impl BoardState {
     /// Constructs a new BoardState.
-    fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
+    pub fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
         let game_over = has_color_won(&board, !turn);
 
         let metadata = (turn as u8) + ((game_over as u8) << 4);

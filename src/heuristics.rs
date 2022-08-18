@@ -112,7 +112,7 @@ where
 ///
 /// This is judged by finding how many X in a rows there are, with bigger Xs
 ///  leading to a higher score.
-fn score_by_closeness_to_win(board: Board) -> isize {
+fn score_by_closeness_to_win(board: &Board) -> isize {
     let mut score = 0;
 
     // First we can calculate scores along the horizontal strips
@@ -141,7 +141,7 @@ fn score_by_closeness_to_win(board: Board) -> isize {
 /// Heuristically determines how good a given board state is.
 ///
 /// Positive values are favorable to true, negative to false.
-pub fn how_good_is(board: Board) -> isize {
+pub fn how_good_is_board(board: &Board) -> isize {
     // TODO: Find a heuristic that doesn't multi count 2 1 1 1 0 0 0 for 1s
     score_by_closeness_to_win(board)
 }
@@ -266,7 +266,7 @@ mod tests {
             [0, 0, 0, 1, 0, 0, 0],
         ]);
 
-        assert_eq!(score_by_closeness_to_win(board), 132);
+        assert_eq!(score_by_closeness_to_win(&board), 132);
 
         let board = Board::from_arrays([
             [2, 2, 2, 1, 2, 2, 2],
@@ -277,6 +277,6 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
-        assert_eq!(score_by_closeness_to_win(board), 0);
+        assert_eq!(score_by_closeness_to_win(&board), 0);
     }
 }
