@@ -77,7 +77,7 @@ impl BoardState {
     }
 
     /// Returns whose turn it is.
-    fn get_turn(&self) -> bool {
+    pub fn get_turn(&self) -> bool {
         self.metadata % 2 == 1
     }
 
