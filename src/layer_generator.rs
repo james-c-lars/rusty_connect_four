@@ -216,11 +216,14 @@ mod tests {
         layer_generator.next();
 
         assert_eq!(layer_generator.get_previous_generation().len(), 0);
-        assert_eq!(layer_generator.get_new_generation().len(), 7);
+        assert_eq!(
+            layer_generator.get_new_generation().len(),
+            BOARD_WIDTH as usize
+        );
 
         let (previous, new) = board_state.get_bottom_two_layers();
 
-        assert_eq!(previous.len(), 7);
+        assert_eq!(previous.len(), BOARD_WIDTH as usize);
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
@@ -233,11 +236,14 @@ mod tests {
         }
 
         assert_eq!(layer_generator.get_previous_generation().len(), 0);
-        assert_eq!(layer_generator.get_new_generation().len(), 49);
+        assert_eq!(
+            layer_generator.get_new_generation().len(),
+            (BOARD_WIDTH * BOARD_WIDTH) as usize
+        );
 
         let (previous, new) = board_state.get_bottom_two_layers();
 
-        assert_eq!(previous.len(), 49);
+        assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH) as usize);
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
@@ -245,34 +251,53 @@ mod tests {
             generation_2: new,
             generation_1_is_new: false,
         };
-        for _ in 0..4 {
+
+        const SOME_NUMBER: u8 = 4;
+        assert!(SOME_NUMBER * 2 < BOARD_WIDTH * BOARD_WIDTH);
+
+        for _ in 0..SOME_NUMBER {
             layer_generator.next();
         }
 
-        assert_eq!(layer_generator.get_previous_generation().len(), 45);
-        assert_eq!(layer_generator.get_new_generation().len(), 28);
+        assert_eq!(
+            layer_generator.get_previous_generation().len(),
+            (BOARD_WIDTH * BOARD_WIDTH - SOME_NUMBER) as usize
+        );
+        assert_eq!(
+            layer_generator.get_new_generation().len(),
+            (SOME_NUMBER * BOARD_WIDTH) as usize
+        );
 
         let (previous, new) = board_state.get_bottom_two_layers();
 
-        assert_eq!(previous.len(), 45);
-        assert_eq!(new.len(), 28);
+        assert_eq!(
+            previous.len(),
+            (BOARD_WIDTH * BOARD_WIDTH - SOME_NUMBER) as usize
+        );
+        assert_eq!(new.len(), (SOME_NUMBER * BOARD_WIDTH) as usize);
 
         let mut layer_generator = LayerGenerator {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
         };
-        for _ in 0..4 {
+        for _ in 0..SOME_NUMBER {
             layer_generator.next();
         }
 
-        assert_eq!(layer_generator.get_previous_generation().len(), 41);
-        assert_eq!(layer_generator.get_new_generation().len(), 56);
+        assert_eq!(
+            layer_generator.get_previous_generation().len(),
+            (BOARD_WIDTH * BOARD_WIDTH - 2 * SOME_NUMBER) as usize
+        );
+        assert_eq!(
+            layer_generator.get_new_generation().len(),
+            (2 * SOME_NUMBER * BOARD_WIDTH) as usize
+        );
 
         let (previous, new) = board_state.get_bottom_two_layers();
 
-        assert_eq!(previous.len(), 41);
-        assert_eq!(new.len(), 56);
+        assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH - 8) as usize);
+        assert_eq!(new.len(), (2 * SOME_NUMBER * BOARD_WIDTH) as usize);
 
         let mut layer_generator = LayerGenerator {
             generation_1: previous,
