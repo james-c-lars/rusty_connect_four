@@ -164,8 +164,8 @@ pub fn get_move_scores() -> Vec<(u8, isize)> {
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
     use crate::{game_manager::get_move_scores, tree_analysis::how_good_is};
+    use serial_test::serial;
 
     use super::{
         generate_x_states, get_position, make_move, start_from_position, CURRENT_BOARD_STATE,
