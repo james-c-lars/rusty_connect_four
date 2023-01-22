@@ -60,6 +60,16 @@ impl Board {
             .unwrap()
     }
 
+    /// Returns if the board is full
+    pub fn is_full(&self) -> bool {
+        for col in 0..BOARD_WIDTH {
+            if self.get_height(col) != BOARD_HEIGHT {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Used to initialize a board based on a 2d array.
     ///
     /// It's meant to be used in internal testing functions and can have unexpected outputs.
@@ -79,6 +89,13 @@ impl Board {
         }
 
         board
+    }
+
+    pub const fn default_const() -> Board {
+        Board {
+            column_heights: [0; BOARD_WIDTH as usize],
+            column_bitmaps: [0; BOARD_WIDTH as usize],
+        }
     }
 }
 

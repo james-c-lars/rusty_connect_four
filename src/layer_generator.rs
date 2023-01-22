@@ -1,4 +1,4 @@
-use crate::board_state::BoardState;
+use crate::board_state::{BoardState, GameOver};
 
 /// Iterator used to generate a BoardState decision tree.
 ///
@@ -98,7 +98,7 @@ impl BoardState {
             if curr_state.children.len() > 0 {
                 // Add the children to the stack to be explored
                 to_explore.extend(curr_state.children.iter_mut());
-            } else if curr_state.is_game_over() == None {
+            } else if curr_state.is_game_over() == GameOver::NoWin {
                 // Otherwise, if the node isn't a dead end (already won)
                 // Add the node to our list of nodes that need children generated
                 bottom_layers[curr_state.get_turn() as usize].push(curr_state);

@@ -4,6 +4,28 @@ use crate::{
     win_check::has_color_won,
 };
 
+/// This represents whether the game is over, and if so how
+#[repr(u8)]
+#[derive(Debug,PartialEq,Eq)]
+pub enum GameOver {
+    NoWin,
+    Tie,
+    OneWins,
+    TwoWins,
+}
+
+impl From<u8> for GameOver {
+    fn from(num: u8) -> Self {
+        match num {
+            0 => Self::NoWin,
+            1 => Self::Tie,
+            2 => Self::OneWins,
+            3 => Self::TwoWins,
+            _ => panic!("Tried to convert a number greater than 3 to a GameOver enum"),
+        }
+    }
+}
+
 /// A BoardState represents a single state of a possible game.
 ///
 /// It has a board.
@@ -22,7 +44,16 @@ pub struct BoardState {
 impl BoardState {
     /// Constructs a new BoardState.
     pub fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
-        let game_over = has_color_won(&board, !turn);
+        let game_over = if has_color_won(&board, !turn) {
+            match !turn {
+                false => GameOver::OneWins,
+                true => GameOver::TwoWins,
+            }
+        } else if board.is_full() {
+            GameOver::Tie
+        } else {
+            GameOver::NoWin
+        };
 
         let metadata = (turn as u8) + ((game_over as u8) << 4);
 
@@ -34,11 +65,21 @@ impl BoardState {
         }
     }
 
+    pub const fn default_const() -> BoardState {
+        BoardState {
+            board: Board::default_const(),
+            children: Vec::new(),
+            last_move: 0,
+            metadata: 0,
+        }
+    }
+
     /// Populates the children vector with new BoardStates.
     pub fn generate_children(&mut self) -> &mut Vec<BoardState> {
         // If this BoardState has an already won game, no children are generated
-        if let Some(_) = self.is_game_over() {
-            return &mut self.children;
+        match self.is_game_over() {
+            GameOver::NoWin => (),
+            _ => return &mut self.children,
         }
 
         let turn = self.get_turn();
@@ -63,6 +104,8 @@ impl BoardState {
     }
 
     /// Used to return the child BoardState corresponding to a particular move.
+    ///
+    /// Fails if the column chosen isn't an option, because it's full.
     pub fn narrow_possibilities(self, col: u8) -> BoardState {
         for child in self.children {
             if child.get_last_move() == col {
@@ -82,12 +125,8 @@ impl BoardState {
     }
 
     /// Returns if the game is over and who won if it is.
-    pub fn is_game_over(&self) -> Option<bool> {
-        if self.metadata > 4 {
-            Some(!self.get_turn())
-        } else {
-            None
-        }
+    pub fn is_game_over(&self) -> GameOver {
+        GameOver::from(self.metadata >> 4)
     }
 
     /// Returns what column the last piece was dropped in.
@@ -105,7 +144,7 @@ impl BoardState {
 mod tests {
     use crate::{
         board::{Board, OutOfBounds},
-        board_state::BoardState,
+        board_state::{BoardState, GameOver},
         consts::BOARD_WIDTH,
     };
 
@@ -124,7 +163,7 @@ mod tests {
 
         for (i, child) in board_state.generate_children().iter().enumerate() {
             assert_eq!(child.get_last_move() as usize, i);
-            assert_eq!(child.is_game_over(), None);
+            assert_eq!(child.is_game_over(), GameOver::NoWin);
             assert_eq!(child.get_turn(), true);
             assert_eq!(child.children.len(), 0);
 
@@ -142,11 +181,34 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
+        let mut board_state = BoardState::new(board, true, 3);
+
+        for child in board_state.generate_children().iter() {
+            assert_eq!(child.get_last_move() as usize, 1);
+            assert_eq!(child.is_game_over(), GameOver::Tie);
+            assert_eq!(child.get_turn(), false);
+            assert_eq!(child.children.len(), 0);
+
+            assert_eq!(
+                child.board.get_piece(child.get_last_move(), 5).unwrap(),
+                true
+            );
+        }
+
+        let board = Board::from_arrays([
+            [2, 0, 2, 1, 2, 2, 2],
+            [1, 1, 1, 2, 1, 1, 1],
+            [2, 2, 1, 1, 1, 2, 1],
+            [1, 1, 2, 2, 1, 1, 2],
+            [2, 2, 1, 1, 2, 2, 1],
+            [2, 2, 1, 1, 2, 1, 2],
+        ]);
+
         let mut board_state = BoardState::new(board, false, 3);
 
         for child in board_state.generate_children().iter() {
             assert_eq!(child.get_last_move() as usize, 1);
-            assert_eq!(child.is_game_over(), Some(false));
+            assert_eq!(child.is_game_over(), GameOver::OneWins);
             assert_eq!(child.get_turn(), true);
             assert_eq!(child.children.len(), 0);
 
@@ -170,7 +232,7 @@ mod tests {
         let mut board_state = BoardState::new(board, true, 3);
 
         for child in board_state.generate_children().iter() {
-            assert_eq!(child.is_game_over(), None);
+            assert_eq!(child.is_game_over(), GameOver::NoWin);
             assert_eq!(child.get_turn(), false);
             assert_eq!(child.children.len(), 0);
 
@@ -231,7 +293,7 @@ mod tests {
             board_state = board_state.narrow_possibilities(i);
 
             assert_eq!(board_state.board, board_clone);
-            assert_eq!(board_state.is_game_over(), None);
+            assert_eq!(board_state.is_game_over(), GameOver::NoWin);
             assert_eq!(board_state.get_turn(), true);
             assert_eq!(board_state.children.len(), 7);
         }
@@ -262,6 +324,15 @@ mod tests {
         for i in 0..21 {
             assert_eq!(i, board_state.get_depth());
             board_state.board.drop_piece(i % 7, (i % 2) == 0).unwrap();
+        }
+    }
+
+    #[test]
+    fn gameover_conversion() {
+        for i in 0..4 {
+            let game = GameOver::from(i);
+            let new_i = game as u8;
+            assert_eq!(i, new_i);
         }
     }
 }

@@ -3,7 +3,7 @@ use std::{
     isize::{MAX, MIN},
 };
 
-use crate::{board_state::BoardState, heuristics::how_good_is_board};
+use crate::{board_state::{BoardState, GameOver}, heuristics::how_good_is_board};
 
 /// Analyses a BoardState to determine how good it is based off of its
 ///  entire decision tree.
@@ -16,8 +16,11 @@ impl BoardState {
     ///  mini-max algorithm.
     fn alpha_beta_pruning(&self, mut alpha: isize, mut beta: isize) -> isize {
         // If the game is over, we can return a score based on who won
-        if let Some(winner) = self.is_game_over() {
-            return if winner { MAX } else { MIN };
+        match self.is_game_over() {
+            GameOver::Tie => return 0,
+            GameOver::OneWins => return MIN,
+            GameOver::TwoWins => return MAX,
+            _ => (),
         }
 
         // If the BoardState is a terminal node we can use our heuristic
