@@ -11,3 +11,6 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [dev-dependencies]
 serial_test = "*"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
