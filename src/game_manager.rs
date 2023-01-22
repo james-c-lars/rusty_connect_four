@@ -164,6 +164,7 @@ pub fn get_move_scores() -> Vec<(u8, isize)> {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
     use crate::{game_manager::get_move_scores, tree_analysis::how_good_is};
 
     use super::{
@@ -171,6 +172,7 @@ mod tests {
     };
 
     #[test]
+    #[serial]
     fn board_translation() {
         let board_array = [
             [0, 0, 0, 0, 0, 0, 2],
@@ -187,6 +189,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn generates_to_win() {
         let board_array = [
             [1, 2, 2, 1, 1, 0, 0],
@@ -221,6 +224,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn drops_successful() {
         let board_array = [
             [1, 2, 2, 1, 1, 0, 0],
@@ -259,6 +263,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn correct_predictions() {
         let board_array = [
             [1, 2, 2, 1, 1, 0, 0],
