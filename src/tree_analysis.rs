@@ -3,7 +3,10 @@ use std::{
     isize::{MAX, MIN},
 };
 
-use crate::{board_state::{BoardState, GameOver}, heuristics::how_good_is_board};
+use crate::{
+    board_state::{BoardState, GameOver},
+    heuristics::how_good_is_board,
+};
 
 /// Analyses a BoardState to determine how good it is based off of its
 ///  entire decision tree.

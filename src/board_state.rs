@@ -6,7 +6,7 @@ use crate::{
 
 /// This represents whether the game is over, and if so how
 #[repr(u8)]
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum GameOver {
     NoWin,
     Tie,

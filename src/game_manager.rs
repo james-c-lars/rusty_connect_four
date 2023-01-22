@@ -13,11 +13,12 @@ static mut LAYER_GENERATOR: Option<LayerGenerator> = None;
 pub fn new_game() {
     unsafe {
         CURRENT_BOARD_STATE = Some(BoardState::default_const());
+        LAYER_GENERATOR = None;
     }
 }
 
 /// Starts a new game from a position
-/// 
+///
 /// The position is given as array[row][col]
 pub fn start_from_position(
     position: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
@@ -30,6 +31,7 @@ pub fn start_from_position(
             turn,
             last_move,
         ));
+        LAYER_GENERATOR = None;
     }
 }
 
@@ -48,10 +50,11 @@ pub fn get_position() -> [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize] {
 
     for row in 0..BOARD_HEIGHT {
         for col in 0..BOARD_WIDTH {
-            position[row as usize][col as usize] = match board.get_piece(col, row) {
-                Ok(piece) => piece as u8,
-                Err(_) => 0,
-            };
+            position[(BOARD_HEIGHT - 1 - row) as usize][col as usize] =
+                match board.get_piece(col, row) {
+                    Ok(piece) => piece as u8 + 1,
+                    Err(_) => 0,
+                };
         }
     }
 
@@ -83,7 +86,7 @@ pub fn generate_x_states(x: isize) {
 }
 
 /// Drop a piece down the corresponding column
-/// 
+///
 /// Returns a tuple containing if the move was made successfully,
 /// if the game is over, and who won the game (0 is tie)
 pub fn make_move(col: u8) -> (bool, bool, u8) {
@@ -92,14 +95,25 @@ pub fn make_move(col: u8) -> (bool, bool, u8) {
             panic!("Could not find the current board state!");
         }
 
+        // If the game is already won, no move is valid
+        if GameOver::NoWin != CURRENT_BOARD_STATE.as_ref().unwrap().is_game_over() {
+            return (false, false, 0);
+        }
+
+        // Generating the next generation if the decision tree is empty
+        if CURRENT_BOARD_STATE.as_ref().unwrap().children.len() == 0 {
+            generate_x_states(1);
+        }
+
         for child in CURRENT_BOARD_STATE.as_ref().unwrap().children.iter() {
             if child.get_last_move() == col {
                 CURRENT_BOARD_STATE = Some(
                     CURRENT_BOARD_STATE
                         .take()
                         .unwrap()
-                        .narrow_possibilities(col)
+                        .narrow_possibilities(col),
                 );
+                LAYER_GENERATOR = Some(LayerGenerator::new(CURRENT_BOARD_STATE.as_mut().unwrap()));
 
                 return match CURRENT_BOARD_STATE.as_ref().unwrap().is_game_over() {
                     GameOver::NoWin => (true, false, 0),
@@ -134,11 +148,172 @@ pub fn get_move_scores() -> Vec<(u8, isize)> {
         let child_score = if whose_turn {
             how_good_is(child)
         } else {
-            -how_good_is(child)
+            // Some funky handling to avoid int overflow on negating isize::MIN
+            match how_good_is(child) {
+                isize::MIN => isize::MAX,
+                isize::MAX => isize::MIN,
+                score => -score,
+            }
         };
 
         move_scores.push((child.get_last_move(), child_score));
     }
 
     move_scores
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{game_manager::get_move_scores, tree_analysis::how_good_is};
+
+    use super::{
+        generate_x_states, get_position, make_move, start_from_position, CURRENT_BOARD_STATE,
+    };
+
+    #[test]
+    fn board_translation() {
+        let board_array = [
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 2, 0, 0, 0, 2, 1],
+            [0, 1, 2, 0, 0, 1, 2],
+            [0, 1, 2, 0, 2, 1, 2],
+        ];
+
+        start_from_position(board_array, true, 6);
+
+        assert_eq!(get_position(), board_array);
+    }
+
+    #[test]
+    fn generates_to_win() {
+        let board_array = [
+            [1, 2, 2, 1, 1, 0, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+        ];
+
+        start_from_position(board_array, false, 0);
+
+        generate_x_states(10000);
+
+        let state;
+        unsafe {
+            state = CURRENT_BOARD_STATE.take().unwrap();
+        }
+
+        assert_eq!(how_good_is(&state), isize::MIN);
+
+        start_from_position(board_array, true, 0);
+
+        generate_x_states(10000);
+
+        let state;
+        unsafe {
+            state = CURRENT_BOARD_STATE.take().unwrap();
+        }
+
+        assert_eq!(how_good_is(&state), 0);
+    }
+
+    #[test]
+    fn drops_successful() {
+        let board_array = [
+            [1, 2, 2, 1, 1, 0, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+        ];
+
+        start_from_position(board_array, false, 0);
+
+        assert_eq!(make_move(5), (true, false, 0));
+        assert_eq!(make_move(5).0, false);
+        assert_eq!(make_move(4).0, false);
+        assert_eq!(make_move(0).0, false);
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, true, 1));
+
+        start_from_position(board_array, true, 0);
+
+        assert_eq!(make_move(5), (true, false, 0));
+        assert_eq!(make_move(5).0, false);
+        assert_eq!(make_move(4).0, false);
+        assert_eq!(make_move(0).0, false);
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, false, 0));
+        assert_eq!(make_move(6), (true, true, 0));
+    }
+
+    #[test]
+    fn correct_predictions() {
+        let board_array = [
+            [1, 2, 2, 1, 1, 0, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [1, 2, 1, 2, 1, 2, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+        ];
+
+        start_from_position(board_array, false, 0);
+        generate_x_states(10000);
+
+        let move_scores = get_move_scores();
+        let real_move_scores = vec![(5, isize::MAX), (6, 0)];
+        assert_eq!(move_scores, real_move_scores);
+
+        start_from_position(board_array, true, 0);
+        generate_x_states(10000);
+
+        let move_scores = get_move_scores();
+        let real_move_scores = vec![(5, 0), (6, 0)];
+        assert_eq!(move_scores, real_move_scores);
+
+        let board_array = [
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 2, 0, 0, 0],
+            [0, 0, 0, 2, 0, 0, 0],
+            [0, 0, 0, 2, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+        ];
+
+        start_from_position(board_array, false, 0);
+        generate_x_states(10000);
+
+        let move_scores = get_move_scores();
+        for (col, score) in move_scores {
+            if col == 3 {
+                assert_ne!(score, isize::MIN);
+            } else {
+                assert_eq!(score, isize::MIN);
+            }
+        }
+
+        start_from_position(board_array, true, 0);
+        generate_x_states(10000);
+
+        let move_scores = get_move_scores();
+        for (col, score) in move_scores {
+            if col == 3 {
+                assert_eq!(score, isize::MAX);
+            } else {
+                assert_ne!(score, isize::MAX);
+            }
+        }
+    }
 }
