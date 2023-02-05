@@ -21,7 +21,7 @@ pub fn new_game() {
 /// Starts a new game from a position
 ///
 /// The position is given as array[row * 7 + col]
-pub fn start_from_position(position: Vec<u8>, turn: bool, last_move: u8) {
+pub fn start_from_position(position: Box<[u8]>, turn: bool, last_move: u8) {
     if position.len() != (BOARD_HEIGHT * BOARD_WIDTH) as usize {
         game_manager::new_game();
     }
@@ -38,17 +38,17 @@ pub fn start_from_position(position: Vec<u8>, turn: bool, last_move: u8) {
 
 #[wasm_bindgen]
 /// Returns the current position of the game as array[row * 6 + col]
-pub fn get_position() -> Vec<u8> {
+pub fn get_position() -> Box<[u8]> {
     let position_2d = game_manager::get_position();
 
-    let mut position = vec![0; (BOARD_HEIGHT * BOARD_WIDTH) as usize];
+    let mut position = [0; (BOARD_HEIGHT * BOARD_WIDTH) as usize];
     for row in 0..BOARD_HEIGHT {
         for col in 0..BOARD_WIDTH {
             position[(row * BOARD_WIDTH + col) as usize] = position_2d[row as usize][col as usize];
         }
     }
 
-    position
+    Box::new(position)
 }
 
 #[wasm_bindgen]
@@ -64,9 +64,10 @@ pub fn generate_x_states(x: isize) {
 /// if the game is over, and who won the game (0 is tie)
 ///
 /// These values are represented as numbers
-pub fn make_move(col: u8) -> Vec<u8> {
+pub fn make_move(col: u8) -> Box<[u8]> {
     let (success, done, winner) = game_manager::make_move(col);
-    vec![success as u8, done as u8, winner]
+    let arr = [success as u8, done as u8, winner];
+    Box::new(arr)
 }
 
 #[wasm_bindgen]
