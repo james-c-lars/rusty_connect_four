@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="styles/main.css">
+    <meta charset="UTF-8">
+    <title>Connect Four</title>
+</head>
+
+
+<body>
+    <div id="template-board" hidden>
+        <link rel="stylesheet" href="styles/board.css">
+    
+        <div class="board">
+    
+            <div class="indicator-container">
+                <!-- A piece will be added here to float above the board -->
+            </div>
+    
+            <div class="eval-bar">
+                <div>
+                    <p id="depth-count">Depth: 0</p>
+                    <p>Higher Number = Better Move</p>
+                    <p id="loading-message">Loading...</p>
+                </div>
+                <div class="eval-cols">
+                    <!-- 7 eval <p> tags will be added here, one for each column -->
+                </div>
+            </div>
+    
+            <div class="piece-container">
+                <!-- 7 column divs are added here, each with 6 pieces -->
+                <div class="settings-popup">
+                    <div>
+                        <u>Settings</u>
+                    </div>
+                    <div></div>
+                    <div>
+                        <label for="color-one">Player One Color:</label>
+                        <input id="color-one" type="color">
+                    </div>
+                    <div>
+                        <label for="color-two">Player Two Color:</label>
+                        <input id="color-two" type="color">
+                    </div>
+                    <div>
+                        <label for="difficulty-div">Computer Difficulty:</label>
+                        <div id="difficulty-div">
+                            <label for="difficulty-easy">Easy</label>
+                            <input
+                                id="difficulty-easy" class="difficulty-select"
+                                type="radio" name="difficulty-select"
+                                value="easy"
+                            >
+                            <label for="difficulty-medium">Medium</label>
+                            <input
+                                id="difficulty-medium" class="difficulty-select"
+                                type="radio" name="difficulty-select"
+                                value="medium"
+                            >
+                            <label for="difficulty-hard">Hard</label>
+                            <input
+                                id="difficulty-hard" class="difficulty-select"
+                                type="radio" name="difficulty-select"
+                                value="hard" checked
+                            >
+                        </div>
+                    </div>
+                    <div>
+                        <label for="evaluation-display">Evaluation Display:</label>
+                        <input id="evaluation-display" type="checkbox">
+                    </div>
+                    <div>
+                        <label for="computer-delay">Computer Delay:</label>
+                        <input id="computer-delay" type="checkbox" checked>
+                    </div>
+                    <div></div>
+                    <div>
+                        <input type="button" id="close-popup" value="Close">
+                    </div>
+                </div>
+            </div>
+    
+            <div class="settings-bar">
+    
+                <div>
+                    <button id="begin-button"> Begin Game </button>
+                </div>
+    
+                <div>
+                    <label for="player-one">Player One:</label>
+                    <select id="player-one" name="Player One">
+                        <option value="human">Human</option>
+                        <option value="computer">Computer</option>
+                    </select>
+                </div>
+    
+                <div>
+                    <label for="player-two">Player Two:</label>
+                    <select id="player-two" name="Player Two">
+                        <option value="human">Human</option>
+                        <option value="computer">Computer</option>
+                    </select>
+                </div>
+    
+                <div>
+                    <img src="./assets/setting-icon.png" class="setting-icon">
+                </div>
+            </div>
+            <p class="game-over">GAME OVER: Player One Wins</p>
+        </div>
+    </div>
+
+
+    <script src="components/board.js"></script>
+    <game-board></game-board>
+</body>
+
+</html>
