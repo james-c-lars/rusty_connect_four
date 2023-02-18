@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     board::{Board, FullColumn},
     consts::BOARD_WIDTH,
@@ -36,7 +38,7 @@ impl From<u8> for GameOver {
 #[derive(Default, Debug)]
 pub struct BoardState {
     pub board: Board,
-    pub children: Vec<BoardState>,
+    pub children: Vec<Rc<BoardState>>,
     last_move: u8,
     metadata: u8,
 }
@@ -75,11 +77,11 @@ impl BoardState {
     }
 
     /// Populates the children vector with new BoardStates.
-    pub fn generate_children(&mut self) -> &mut Vec<BoardState> {
+    pub fn generate_children(&mut self) -> Vec<Rc<BoardState>> {
         // If this BoardState has an already won game, no children are generated
         match self.is_game_over() {
             GameOver::NoWin => (),
-            _ => return &mut self.children,
+            _ => return self.children.clone(),
         }
 
         let turn = self.get_turn();
@@ -93,20 +95,20 @@ impl BoardState {
                 continue;
             } else {
                 // We then add a new BoardState corresponding to the move just played
-                self.children.push(BoardState::new(new_board, !turn, col));
+                self.children.push(BoardState::new(new_board, !turn, col).into());
 
                 // We now refresh the board we're using
                 new_board = self.board.clone();
             }
         }
 
-        &mut self.children
+        self.children.clone()
     }
 
     /// Used to return the child BoardState corresponding to a particular move.
     ///
     /// Fails if the column chosen isn't an option, because it's full.
-    pub fn narrow_possibilities(self, col: u8) -> BoardState {
+    pub fn narrow_possibilities(self, col: u8) -> Rc<BoardState> {
         for child in self.children {
             if child.get_last_move() == col {
                 return child;
@@ -142,6 +144,8 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::{
         board::{Board, OutOfBounds},
         board_state::{BoardState, GameOver},
@@ -282,7 +286,7 @@ mod tests {
         ]);
 
         for i in 0..BOARD_WIDTH {
-            let mut board_state = BoardState::new(board.clone(), false, 3);
+            let mut board_state: Rc<BoardState> = BoardState::new(board.clone(), false, 3).into();
             for child in board_state.generate_children() {
                 child.generate_children();
             }

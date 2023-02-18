@@ -1,19 +1,22 @@
+use std::rc::Rc;
+
 use crate::board_state::{BoardState, GameOver};
 
 /// Iterator used to generate a BoardState decision tree.
 ///
 /// Iteration will stop when the decision tree is complete.
-pub struct LayerGenerator<'a> {
-    generation_1: Vec<&'a mut BoardState>,
-    generation_2: Vec<&'a mut BoardState>,
+#[derive(Debug)]
+pub struct LayerGenerator {
+    generation_1: Vec<Rc<BoardState>>,
+    generation_2: Vec<Rc<BoardState>>,
     generation_1_is_new: bool,
 }
 
-impl<'a> LayerGenerator<'a> {
+impl LayerGenerator {
     /// Gets the newest of the two stored generations.
     ///
     /// The new generation will be the one at the bottom of the decision tree.
-    fn get_new_generation(&mut self) -> &mut Vec<&'a mut BoardState> {
+    fn get_new_generation(&mut self) -> &mut Vec<Rc<BoardState>> {
         if self.generation_1_is_new {
             &mut self.generation_1
         } else {
@@ -24,7 +27,7 @@ impl<'a> LayerGenerator<'a> {
     /// Gets the previous of the two stored generations.
     ///
     /// The previous generation will be the next-to-last layer of the decision tree.
-    fn get_previous_generation(&mut self) -> &mut Vec<&'a mut BoardState> {
+    fn get_previous_generation(&mut self) -> &mut Vec<Rc<BoardState>> {
         if self.generation_1_is_new {
             &mut self.generation_2
         } else {
@@ -33,8 +36,8 @@ impl<'a> LayerGenerator<'a> {
     }
 
     /// Constructs a new LayerGenerator for a given BoardState
-    pub fn new(board: &mut BoardState) -> LayerGenerator {
-        let (previous_generation, new_generation) = board.get_bottom_two_layers();
+    pub fn new(board: Rc<BoardState>) -> LayerGenerator {
+        let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
 
         LayerGenerator {
             generation_1: previous_generation,
@@ -42,62 +45,29 @@ impl<'a> LayerGenerator<'a> {
             generation_1_is_new: false,
         }
     }
-}
 
-impl<'a> Iterator for LayerGenerator<'a> {
-    type Item = ();
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // If there are still BoardStates in the previous generation, we can
-        //  continue computing from there
-        if let Some(board_state) = self.get_previous_generation().pop() {
-            self.get_new_generation()
-                .extend(board_state.generate_children().iter_mut());
-
-            Some(())
-        } else if self.get_new_generation().len() > 0 {
-            // Otherwise, as long as there are a new set of BoardStates for
-            //  us to compute children for, we can continue computing for
-            //  the new set of BoardStates
-
-            // To do this, we flip our generation vectors
-            // The empty previous_generation vector becomes the new new_generation
-            //  vector and the full new_generation vector becomes the new
-            //  previous_generation vector
-            self.generation_1_is_new = !self.generation_1_is_new;
-
-            self.next()
-        } else {
-            // If there are no more nodes needing computation, the decision tree is
-            //  complete and we can stop iterating
-            None
-        }
-    }
-}
-
-impl BoardState {
     /// Finds the BoardStates at the bottom of the decision tree and returns
     ///  vectors to them.
     ///
     /// Helper function for use in creating a new LayerGenerator.
     ///
     /// Returns a tuple of (previous_generation, new_generation).
-    fn get_bottom_two_layers(&mut self) -> (Vec<&mut BoardState>, Vec<&mut BoardState>) {
+    fn get_bottom_two_layers(board: Rc<BoardState>) -> (Vec<Rc<BoardState>>, Vec<Rc<BoardState>>) {
         // bottom_layers will contain all games that still need children generated
         // This should only consist of one or two distinct generations
         // We can separate the generations via whose turn it is
-        let mut bottom_layers: [Vec<&mut BoardState>; 2] = [Vec::new(), Vec::new()];
+        let mut bottom_layers: [Vec<Rc<BoardState>>; 2] = [Vec::new(), Vec::new()];
 
         // to_explore is a stack of all the nodes left to explore as we search for the
         //  bottom
-        let mut to_explore: Vec<&mut BoardState> = vec![self];
+        let mut to_explore: Vec<Rc<BoardState>> = vec![board];
 
         // While our exploration stack still has nodes
         while let Some(curr_state) = to_explore.pop() {
             // If the node already has had its children generated
             if curr_state.children.len() > 0 {
                 // Add the children to the stack to be explored
-                to_explore.extend(curr_state.children.iter_mut());
+                to_explore.extend(curr_state.children.clone());
             } else if curr_state.is_game_over() == GameOver::NoWin {
                 // Otherwise, if the node isn't a dead end (already won)
                 // Add the node to our list of nodes that need children generated
@@ -136,6 +106,37 @@ impl BoardState {
     }
 }
 
+impl Iterator for LayerGenerator {
+    type Item = ();
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // If there are still BoardStates in the previous generation, we can
+        //  continue computing from there
+        if let Some(board_state) = self.get_previous_generation().pop() {
+            self.get_new_generation()
+                .extend(board_state.generate_children());
+
+            Some(())
+        } else if self.get_new_generation().len() > 0 {
+            // Otherwise, as long as there are a new set of BoardStates for
+            //  us to compute children for, we can continue computing for
+            //  the new set of BoardStates
+
+            // To do this, we flip our generation vectors
+            // The empty previous_generation vector becomes the new new_generation
+            //  vector and the full new_generation vector becomes the new
+            //  previous_generation vector
+            self.generation_1_is_new = !self.generation_1_is_new;
+
+            self.next()
+        } else {
+            // If there are no more nodes needing computation, the decision tree is
+            //  complete and we can stop iterating
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{board::Board, board_state::BoardState, consts::BOARD_WIDTH};
@@ -145,7 +146,7 @@ mod tests {
     #[test]
     fn layer_generator() {
         let mut board_state = BoardState::default();
-        let first_generation = vec![&mut board_state];
+        let first_generation = vec![board_state.into()];
 
         let mut layer_generator = LayerGenerator {
             generation_1: first_generation,
@@ -184,7 +185,7 @@ mod tests {
         assert_eq!(board_state.children[6].children[6].board, last_board);
 
         let mut board_state = BoardState::default();
-        let first_generation = vec![&mut board_state];
+        let first_generation = vec![board_state.into()];
 
         let mut layer_generator = LayerGenerator {
             generation_1: first_generation,
@@ -203,7 +204,7 @@ mod tests {
     fn get_bottom_two_layers() {
         let mut board_state = BoardState::default();
 
-        let (previous, new) = board_state.get_bottom_two_layers();
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
 
         assert_eq!(previous.len(), 1);
         assert_eq!(new.len(), 0);
@@ -221,7 +222,7 @@ mod tests {
             BOARD_WIDTH as usize
         );
 
-        let (previous, new) = board_state.get_bottom_two_layers();
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
 
         assert_eq!(previous.len(), BOARD_WIDTH as usize);
         assert_eq!(new.len(), 0);
@@ -241,7 +242,7 @@ mod tests {
             (BOARD_WIDTH * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) = board_state.get_bottom_two_layers();
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
 
         assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH) as usize);
         assert_eq!(new.len(), 0);
@@ -268,7 +269,7 @@ mod tests {
             (SOME_NUMBER * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) = board_state.get_bottom_two_layers();
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
 
         assert_eq!(
             previous.len(),
@@ -294,7 +295,7 @@ mod tests {
             (2 * SOME_NUMBER * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) = board_state.get_bottom_two_layers();
+        let (previous, new) =LayerGenerator::get_bottom_two_layers(board_state.into());
 
         assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH - 8) as usize);
         assert_eq!(new.len(), (2 * SOME_NUMBER * BOARD_WIDTH) as usize);
