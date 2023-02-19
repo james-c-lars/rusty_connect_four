@@ -3,7 +3,7 @@ use std::{
     isize::{MAX, MIN},
 };
 
-use crate::{
+use crate::game_engine::{
     board_state::{BoardState, GameOver},
     heuristics::how_good_is_board,
 };
@@ -72,7 +72,7 @@ mod tests {
         rc::Rc,
     };
 
-    use crate::{board::Board, board_state::BoardState, layer_generator::LayerGenerator};
+    use crate::game_engine::{board::Board, board_state::BoardState, layer_generator::LayerGenerator};
 
     use super::how_good_is;
 

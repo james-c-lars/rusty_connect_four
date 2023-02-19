@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{
+use crate::game_engine::{
     board::{Board, FullColumn},
     consts::BOARD_WIDTH,
     win_check::has_color_won,
@@ -148,7 +148,7 @@ impl BoardState {
 mod tests {
     use std::{cell::RefCell, rc::Rc};
 
-    use crate::{
+    use crate::game_engine::{
         board::{Board, OutOfBounds},
         board_state::{BoardState, GameOver},
         consts::BOARD_WIDTH,

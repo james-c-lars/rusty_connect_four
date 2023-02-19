@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{
+use crate::game_engine::{
     board::Board,
     board_state::{BoardState, GameOver},
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
@@ -138,7 +138,7 @@ impl GameManager {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{board_state::GameOver, game_manager::GameManager, tree_analysis::how_good_is};
+    use crate::game_engine::{board_state::GameOver, game_manager::GameManager, tree_analysis::how_good_is};
 
     #[test]
     fn board_translation() {

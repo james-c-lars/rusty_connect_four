@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::board_state::{BoardState, GameOver};
+use crate::game_engine::board_state::{BoardState, GameOver};
 
 /// Iterator used to generate a BoardState decision tree.
 ///
@@ -143,7 +143,7 @@ impl Iterator for LayerGenerator {
 mod tests {
     use std::{cell::RefCell, rc::Rc};
 
-    use crate::{board::Board, board_state::BoardState, consts::BOARD_WIDTH};
+    use crate::game_engine::{board::Board, board_state::BoardState, consts::BOARD_WIDTH};
 
     use super::LayerGenerator;
 

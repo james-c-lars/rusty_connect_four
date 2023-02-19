@@ -1,4 +1,4 @@
-use crate::{
+use crate::game_engine::{
     board::{Board, OutOfBounds},
     consts::{NUMBER_TO_WIN, SCALING_HEURISTIC},
 };
@@ -148,7 +148,7 @@ pub fn how_good_is_board(board: &Board) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::game_engine::{
         board::{Board, OutOfBounds},
         heuristics::score_circle_buffer,
     };

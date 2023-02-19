@@ -1,6 +1,6 @@
 use std::cmp::{max, min};
 
-use crate::{
+use crate::game_engine::{
     board::{Board, OutOfBounds},
     consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN},
 };
@@ -374,7 +374,7 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::board::{Board, OutOfBounds};
+    use crate::game_engine::board::{Board, OutOfBounds};
 
     fn piece_to_num(piece: Result<bool, OutOfBounds>) -> u8 {
         match piece {

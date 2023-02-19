@@ -1,4 +1,4 @@
-use crate::{
+use crate::game_engine::{
     board::{Board, OutOfBounds},
     consts::NUMBER_TO_WIN,
 };
@@ -97,7 +97,7 @@ fn increment_if_matching(in_a_row: u8, piece: Result<bool, OutOfBounds>, color: 
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::game_engine::{
         board::Board,
         win_check::{
             has_color_won, has_color_won_downward_diagonally, has_color_won_horizontally,

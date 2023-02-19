@@ -1,7 +1,13 @@
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 
+mod game_engine;
+
+use game_engine::game_manager::GameManager;
+
 fn slow_process(state_clone: Arc<Mutex<State>>) {
+    let _manager = GameManager::new_game();
+
     loop {
         let duration = 1000;
         println!("going to sleep for {}ms", duration);
@@ -48,11 +54,19 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(format!(
-                "woke up after {}ms",
-                self.state.lock().unwrap().duration
-            ));
+            // This is the UI creation
+            
+            // Connect 4 heading
+            ui.scope(|ui| {
+                ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
+            
+                ui.label("Connect 4");
+            });
+
         });
+
+        // Printing to the console to show that things have rerendered
         println!(".");
     }
 }
@@ -60,7 +74,7 @@ impl eframe::App for App {
 fn main() {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "eframe template",
+        "Connect 4 Engine",
         native_options,
         Box::new(|cc| Box::new(App::new(cc))),
     );
