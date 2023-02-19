@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, cell::RefCell};
 
 use crate::{
     board::{Board, FullColumn},
@@ -38,7 +38,7 @@ impl From<u8> for GameOver {
 #[derive(Default, Debug)]
 pub struct BoardState {
     pub board: Board,
-    pub children: Vec<Rc<BoardState>>,
+    pub children: Vec<Rc<RefCell<BoardState>>>,
     last_move: u8,
     metadata: u8,
 }
@@ -77,7 +77,7 @@ impl BoardState {
     }
 
     /// Populates the children vector with new BoardStates.
-    pub fn generate_children(&mut self) -> Vec<Rc<BoardState>> {
+    pub fn generate_children(&mut self) -> Vec<Rc<RefCell<BoardState>>> {
         // If this BoardState has an already won game, no children are generated
         match self.is_game_over() {
             GameOver::NoWin => (),
@@ -95,7 +95,7 @@ impl BoardState {
                 continue;
             } else {
                 // We then add a new BoardState corresponding to the move just played
-                self.children.push(BoardState::new(new_board, !turn, col).into());
+                self.children.push(RefCell::new(BoardState::new(new_board, !turn, col)).into());
 
                 // We now refresh the board we're using
                 new_board = self.board.clone();
@@ -108,9 +108,9 @@ impl BoardState {
     /// Used to return the child BoardState corresponding to a particular move.
     ///
     /// Fails if the column chosen isn't an option, because it's full.
-    pub fn narrow_possibilities(self, col: u8) -> Rc<BoardState> {
+    pub fn narrow_possibilities(self, col: u8) -> Rc<RefCell<BoardState>> {
         for child in self.children {
-            if child.get_last_move() == col {
+            if child.borrow().get_last_move() == col {
                 return child;
             }
         }
@@ -144,7 +144,7 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{rc::Rc, cell::RefCell};
 
     use crate::{
         board::{Board, OutOfBounds},
@@ -166,15 +166,15 @@ mod tests {
         let mut board_state = BoardState::new(board, false, 3);
 
         for (i, child) in board_state.generate_children().iter().enumerate() {
-            assert_eq!(child.get_last_move() as usize, i);
-            assert_eq!(child.is_game_over(), GameOver::NoWin);
-            assert_eq!(child.get_turn(), true);
-            assert_eq!(child.children.len(), 0);
+            assert_eq!(child.borrow().get_last_move() as usize, i);
+            assert_eq!(child.borrow().is_game_over(), GameOver::NoWin);
+            assert_eq!(child.borrow().get_turn(), true);
+            assert_eq!(child.borrow().children.len(), 0);
 
-            assert_eq!(child.board.get_piece(i as u8, 0).unwrap(), false);
+            assert_eq!(child.borrow().board.get_piece(i as u8, 0).unwrap(), false);
         }
 
-        assert_eq!(board_state.children[3].board.get_piece(3, 4), Ok(false));
+        assert_eq!(board_state.children[3].borrow().board.get_piece(3, 4), Ok(false));
 
         let board = Board::from_arrays([
             [2, 0, 2, 1, 2, 2, 2],
@@ -188,13 +188,13 @@ mod tests {
         let mut board_state = BoardState::new(board, true, 3);
 
         for child in board_state.generate_children().iter() {
-            assert_eq!(child.get_last_move() as usize, 1);
-            assert_eq!(child.is_game_over(), GameOver::Tie);
-            assert_eq!(child.get_turn(), false);
-            assert_eq!(child.children.len(), 0);
+            assert_eq!(child.borrow().get_last_move() as usize, 1);
+            assert_eq!(child.borrow().is_game_over(), GameOver::Tie);
+            assert_eq!(child.borrow().get_turn(), false);
+            assert_eq!(child.borrow().children.len(), 0);
 
             assert_eq!(
-                child.board.get_piece(child.get_last_move(), 5).unwrap(),
+                child.borrow().board.get_piece(child.borrow().get_last_move(), 5).unwrap(),
                 true
             );
         }
@@ -211,13 +211,13 @@ mod tests {
         let mut board_state = BoardState::new(board, false, 3);
 
         for child in board_state.generate_children().iter() {
-            assert_eq!(child.get_last_move() as usize, 1);
-            assert_eq!(child.is_game_over(), GameOver::OneWins);
-            assert_eq!(child.get_turn(), true);
-            assert_eq!(child.children.len(), 0);
+            assert_eq!(child.borrow().get_last_move() as usize, 1);
+            assert_eq!(child.borrow().is_game_over(), GameOver::OneWins);
+            assert_eq!(child.borrow().get_turn(), true);
+            assert_eq!(child.borrow().children.len(), 0);
 
             assert_eq!(
-                child.board.get_piece(child.get_last_move(), 5).unwrap(),
+                child.borrow().board.get_piece(child.borrow().get_last_move(), 5).unwrap(),
                 false
             );
         }
@@ -236,21 +236,22 @@ mod tests {
         let mut board_state = BoardState::new(board, true, 3);
 
         for child in board_state.generate_children().iter() {
-            assert_eq!(child.is_game_over(), GameOver::NoWin);
-            assert_eq!(child.get_turn(), false);
-            assert_eq!(child.children.len(), 0);
+            assert_eq!(child.borrow().is_game_over(), GameOver::NoWin);
+            assert_eq!(child.borrow().get_turn(), false);
+            assert_eq!(child.borrow().children.len(), 0);
 
-            let col = child.get_last_move();
+            let col = child.borrow().get_last_move();
             assert_eq!(
                 child
+                    .borrow()
                     .board
-                    .get_piece(col, child.board.get_height(col) - 1)
+                    .get_piece(col, child.borrow().board.get_height(col) - 1)
                     .unwrap(),
                 true
             );
 
             if col != 0 {
-                assert_eq!(child.board.get_piece(0, 3), Err(OutOfBounds));
+                assert_eq!(child.borrow().board.get_piece(0, 3), Err(OutOfBounds));
             }
         }
 
@@ -286,20 +287,20 @@ mod tests {
         ]);
 
         for i in 0..BOARD_WIDTH {
-            let mut board_state: Rc<BoardState> = BoardState::new(board.clone(), false, 3).into();
-            for child in board_state.generate_children() {
-                child.generate_children();
+            let mut board_state: Rc<RefCell<BoardState>> = RefCell::new(BoardState::new(board.clone(), false, 3)).into();
+            for child in board_state.borrow_mut().generate_children() {
+                child.borrow_mut().generate_children();
             }
 
             let mut board_clone = board.clone();
             board_clone.drop_piece(i, false).unwrap();
 
-            board_state = board_state.narrow_possibilities(i);
+            board_state = board_state.take().narrow_possibilities(i);
 
-            assert_eq!(board_state.board, board_clone);
-            assert_eq!(board_state.is_game_over(), GameOver::NoWin);
-            assert_eq!(board_state.get_turn(), true);
-            assert_eq!(board_state.children.len(), 7);
+            assert_eq!(board_state.borrow().board, board_clone);
+            assert_eq!(board_state.borrow().is_game_over(), GameOver::NoWin);
+            assert_eq!(board_state.borrow().get_turn(), true);
+            assert_eq!(board_state.borrow().children.len(), 7);
         }
     }
 

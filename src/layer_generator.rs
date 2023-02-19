@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, cell::RefCell};
 
 use crate::board_state::{BoardState, GameOver};
 
@@ -7,8 +7,8 @@ use crate::board_state::{BoardState, GameOver};
 /// Iteration will stop when the decision tree is complete.
 #[derive(Debug)]
 pub struct LayerGenerator {
-    generation_1: Vec<Rc<BoardState>>,
-    generation_2: Vec<Rc<BoardState>>,
+    generation_1: Vec<Rc<RefCell<BoardState>>>,
+    generation_2: Vec<Rc<RefCell<BoardState>>>,
     generation_1_is_new: bool,
 }
 
@@ -16,7 +16,7 @@ impl LayerGenerator {
     /// Gets the newest of the two stored generations.
     ///
     /// The new generation will be the one at the bottom of the decision tree.
-    fn get_new_generation(&mut self) -> &mut Vec<Rc<BoardState>> {
+    fn get_new_generation(&mut self) -> &mut Vec<Rc<RefCell<BoardState>>> {
         if self.generation_1_is_new {
             &mut self.generation_1
         } else {
@@ -27,7 +27,7 @@ impl LayerGenerator {
     /// Gets the previous of the two stored generations.
     ///
     /// The previous generation will be the next-to-last layer of the decision tree.
-    fn get_previous_generation(&mut self) -> &mut Vec<Rc<BoardState>> {
+    fn get_previous_generation(&mut self) -> &mut Vec<Rc<RefCell<BoardState>>> {
         if self.generation_1_is_new {
             &mut self.generation_2
         } else {
@@ -36,7 +36,7 @@ impl LayerGenerator {
     }
 
     /// Constructs a new LayerGenerator for a given BoardState
-    pub fn new(board: Rc<BoardState>) -> LayerGenerator {
+    pub fn new(board: Rc<RefCell<BoardState>>) -> LayerGenerator {
         let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
 
         LayerGenerator {
@@ -52,26 +52,26 @@ impl LayerGenerator {
     /// Helper function for use in creating a new LayerGenerator.
     ///
     /// Returns a tuple of (previous_generation, new_generation).
-    fn get_bottom_two_layers(board: Rc<BoardState>) -> (Vec<Rc<BoardState>>, Vec<Rc<BoardState>>) {
+    fn get_bottom_two_layers(board: Rc<RefCell<BoardState>>) -> (Vec<Rc<RefCell<BoardState>>>, Vec<Rc<RefCell<BoardState>>>) {
         // bottom_layers will contain all games that still need children generated
         // This should only consist of one or two distinct generations
         // We can separate the generations via whose turn it is
-        let mut bottom_layers: [Vec<Rc<BoardState>>; 2] = [Vec::new(), Vec::new()];
+        let mut bottom_layers: [Vec<Rc<RefCell<BoardState>>>; 2] = [Vec::new(), Vec::new()];
 
         // to_explore is a stack of all the nodes left to explore as we search for the
         //  bottom
-        let mut to_explore: Vec<Rc<BoardState>> = vec![board];
+        let mut to_explore: Vec<Rc<RefCell<BoardState>>> = vec![board];
 
         // While our exploration stack still has nodes
         while let Some(curr_state) = to_explore.pop() {
             // If the node already has had its children generated
-            if curr_state.children.len() > 0 {
+            if curr_state.borrow().children.len() > 0 {
                 // Add the children to the stack to be explored
-                to_explore.extend(curr_state.children.clone());
-            } else if curr_state.is_game_over() == GameOver::NoWin {
+                to_explore.extend(curr_state.borrow().children.clone());
+            } else if curr_state.borrow().is_game_over() == GameOver::NoWin {
                 // Otherwise, if the node isn't a dead end (already won)
                 // Add the node to our list of nodes that need children generated
-                bottom_layers[curr_state.get_turn() as usize].push(curr_state);
+                bottom_layers[curr_state.borrow().get_turn() as usize].push(curr_state.clone());
             }
         }
 
@@ -85,8 +85,8 @@ impl LayerGenerator {
         // First we need to make sure there's even a node in each generation to compare
         if false_layer.len() > 0 && true_layer.len() > 0 {
             // Then we can calculate the depth
-            let false_depth = false_layer[0].get_depth();
-            let true_depth = true_layer[0].get_depth();
+            let false_depth = false_layer[0].borrow().get_depth();
+            let true_depth = true_layer[0].borrow().get_depth();
 
             if false_depth < true_depth {
                 (false_layer, true_layer)
@@ -114,7 +114,7 @@ impl Iterator for LayerGenerator {
         //  continue computing from there
         if let Some(board_state) = self.get_previous_generation().pop() {
             self.get_new_generation()
-                .extend(board_state.generate_children());
+                .extend(board_state.borrow_mut().generate_children());
 
             Some(())
         } else if self.get_new_generation().len() > 0 {
@@ -139,14 +139,16 @@ impl Iterator for LayerGenerator {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
     use crate::{board::Board, board_state::BoardState, consts::BOARD_WIDTH};
 
     use super::LayerGenerator;
 
     #[test]
     fn layer_generator() {
-        let mut board_state = BoardState::default();
-        let first_generation = vec![board_state.into()];
+        let board_state = Rc::new(RefCell::new(BoardState::default()));
+        let first_generation = vec![board_state.clone()];
 
         let mut layer_generator = LayerGenerator {
             generation_1: first_generation,
@@ -182,9 +184,9 @@ mod tests {
             [0, 0, 0, 0, 0, 0, 1],
         ]);
 
-        assert_eq!(board_state.children[6].children[6].board, last_board);
+        assert_eq!(board_state.borrow().children[6].borrow().children[6].borrow().board, last_board);
 
-        let mut board_state = BoardState::default();
+        let board_state = RefCell::new(BoardState::default());
         let first_generation = vec![board_state.into()];
 
         let mut layer_generator = LayerGenerator {
@@ -202,9 +204,9 @@ mod tests {
 
     #[test]
     fn get_bottom_two_layers() {
-        let mut board_state = BoardState::default();
+        let board_state = Rc::new(RefCell::new(BoardState::default()));
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), 1);
         assert_eq!(new.len(), 0);
@@ -222,7 +224,7 @@ mod tests {
             BOARD_WIDTH as usize
         );
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), BOARD_WIDTH as usize);
         assert_eq!(new.len(), 0);
@@ -242,7 +244,7 @@ mod tests {
             (BOARD_WIDTH * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH) as usize);
         assert_eq!(new.len(), 0);
@@ -269,7 +271,7 @@ mod tests {
             (SOME_NUMBER * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.into());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(
             previous.len(),
@@ -295,7 +297,7 @@ mod tests {
             (2 * SOME_NUMBER * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) =LayerGenerator::get_bottom_two_layers(board_state.into());
+        let (previous, new) =LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH - 8) as usize);
         assert_eq!(new.len(), (2 * SOME_NUMBER * BOARD_WIDTH) as usize);
@@ -309,14 +311,14 @@ mod tests {
             layer_generator.next();
         }
 
-        let previous_depth = layer_generator.get_previous_generation()[0].get_depth();
+        let previous_depth = layer_generator.get_previous_generation()[0].borrow().get_depth();
         for previous_state in layer_generator.get_previous_generation().iter() {
-            assert_eq!(previous_state.get_depth(), previous_depth);
+            assert_eq!(previous_state.borrow().get_depth(), previous_depth);
         }
 
-        let new_depth = layer_generator.get_new_generation()[0].get_depth();
+        let new_depth = layer_generator.get_new_generation()[0].borrow().get_depth();
         for new_state in layer_generator.get_new_generation().iter() {
-            assert_eq!(new_state.get_depth(), new_depth);
+            assert_eq!(new_state.borrow().get_depth(), new_depth);
         }
 
         assert_eq!(previous_depth + 1, new_depth);

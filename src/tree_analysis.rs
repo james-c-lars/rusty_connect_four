@@ -36,7 +36,7 @@ impl BoardState {
             // We are the maximizing player
             let mut value = MIN;
             for child in self.children.iter() {
-                value = max(value, child.alpha_beta_pruning(alpha, beta));
+                value = max(value, child.borrow().alpha_beta_pruning(alpha, beta));
 
                 if value >= beta {
                     break;
@@ -50,7 +50,7 @@ impl BoardState {
             // We are the minimizing player
             let mut value = MAX;
             for child in self.children.iter() {
-                value = min(value, child.alpha_beta_pruning(alpha, beta));
+                value = min(value, child.borrow().alpha_beta_pruning(alpha, beta));
 
                 if value <= alpha {
                     break;
@@ -66,7 +66,7 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
-    use std::isize::{MAX, MIN};
+    use std::{isize::{MAX, MIN}, cell::RefCell, rc::Rc};
 
     use crate::{board::Board, board_state::BoardState, layer_generator::LayerGenerator};
 
@@ -83,14 +83,14 @@ mod tests {
             [0, 1, 1, 1, 0, 0, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, false, 0);
-        let mut generator = LayerGenerator::new(&mut board_state);
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, false, 0)));
+        let mut generator = LayerGenerator::new(board_state.clone());
 
         for _ in 0..1000 {
             generator.next();
         }
 
-        assert_eq!(how_good_is(&board_state), MIN);
+        assert_eq!(how_good_is(&board_state.borrow()), MIN);
 
         let board = Board::from_arrays([
             [0, 0, 0, 0, 0, 0, 0],
@@ -101,15 +101,15 @@ mod tests {
             [0, 1, 1, 0, 2, 2, 1],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 0);
-        let mut generator = LayerGenerator::new(&mut board_state);
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+        let mut generator = LayerGenerator::new(board_state.clone());
 
         for _ in 0..1000 {
             generator.next();
         }
 
-        assert_ne!(how_good_is(&board_state), MIN);
-        assert_ne!(how_good_is(&board_state), MAX);
+        assert_ne!(how_good_is(&board_state.borrow()), MIN);
+        assert_ne!(how_good_is(&board_state.borrow()), MAX);
 
         let board = Board::from_arrays([
             [1, 2, 2, 1, 1, 0, 0],
@@ -120,14 +120,14 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, false, 0);
-        let mut generator = LayerGenerator::new(&mut board_state);
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, false, 0)));
+        let mut generator = LayerGenerator::new(board_state.clone());
 
         for _ in 0..1000 {
             generator.next();
         }
 
-        assert_eq!(how_good_is(&board_state), MIN);
+        assert_eq!(how_good_is(&board_state.borrow()), MIN);
 
         let board = Board::from_arrays([
             [1, 2, 2, 1, 1, 0, 0],
@@ -138,13 +138,13 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 0);
-        let mut generator = LayerGenerator::new(&mut board_state);
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+        let mut generator = LayerGenerator::new(board_state.clone());
 
         for _ in 0..1000 {
             generator.next();
         }
 
-        assert_eq!(how_good_is(&board_state), 0);
+        assert_eq!(how_good_is(&board_state.borrow()), 0);
     }
 }
