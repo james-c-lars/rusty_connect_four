@@ -30,7 +30,7 @@ impl State {
 }
 
 pub struct App {
-    state: Arc<Mutex<State>>, 
+    state: Arc<Mutex<State>>,
 }
 
 impl App {
@@ -41,16 +41,17 @@ impl App {
         std::thread::spawn(move || {
             slow_process(state_clone);
         });
-        Self {
-            state,
-        }
+        Self { state }
     }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(format!("woke up after {}ms", self.state.lock().unwrap().duration));
+            ui.label(format!(
+                "woke up after {}ms",
+                self.state.lock().unwrap().duration
+            ));
         });
         println!(".");
     }

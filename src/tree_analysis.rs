@@ -66,7 +66,11 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
-    use std::{isize::{MAX, MIN}, cell::RefCell, rc::Rc};
+    use std::{
+        cell::RefCell,
+        isize::{MAX, MIN},
+        rc::Rc,
+    };
 
     use crate::{board::Board, board_state::BoardState, layer_generator::LayerGenerator};
 

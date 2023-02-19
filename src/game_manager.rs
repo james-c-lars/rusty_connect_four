@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc, cell::RefCell};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     board::Board,
@@ -15,7 +15,7 @@ pub struct GameManager {
 }
 
 impl GameManager {
-    /// Starts a new game with an empty board
+    /// Starts a new game with an empty board.
     pub fn new_game() -> GameManager {
         let state: Rc<RefCell<BoardState>> = RefCell::new(BoardState::default_const()).into();
 
@@ -25,9 +25,9 @@ impl GameManager {
         }
     }
 
-    /// Starts a new game from a position
+    /// Starts a new game from a position.
     ///
-    /// The position is given as array[row][col]
+    /// The position is given as array[row][col].
     pub fn start_from_position(
         position: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
         turn: bool,
@@ -37,32 +37,21 @@ impl GameManager {
             Board::from_arrays(position),
             turn,
             last_move,
-        )).into();
+        ))
+        .into();
 
         GameManager {
             board_state: state.clone(),
             layer_generator: LayerGenerator::new(state),
         }
     }
-    
-    /// Returns the current position of the game as array[row][col]
+
+    /// Returns the current position of the game as array[row][col].
     pub fn get_position(&self) -> [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize] {
-        let mut position = [[0; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize];
-
-        for row in 0..BOARD_HEIGHT {
-            for col in 0..BOARD_WIDTH {
-                position[(BOARD_HEIGHT - 1 - row) as usize][col as usize] =
-                    match self.board_state.borrow().board.get_piece(col, row) {
-                        Ok(piece) => piece as u8 + 1,
-                        Err(_) => 0,
-                    };
-            }
-        }
-
-        position
+        self.board_state.borrow().board.to_arrays()
     }
-    
-    /// Generates up to x board states in the decision tree
+
+    /// Generates up to x board states in the decision tree.
     pub fn generate_x_states(&mut self, x: isize) {
         for _ in 0..x {
             if let None = self.layer_generator.next() {
@@ -70,8 +59,8 @@ impl GameManager {
             }
         }
     }
-    
-    /// Drop a piece down the corresponding column
+
+    /// Drop a piece down the corresponding column.
     pub fn make_move(&mut self, col: u8) -> Result<(), String> {
         // If the game is already won, no move is valid
         if GameOver::NoWin != self.board_state.borrow().is_game_over() {
@@ -83,7 +72,10 @@ impl GameManager {
             self.generate_x_states(1);
 
             if self.board_state.borrow().children.len() == 0 {
-                return Err(format!("Was unable to generate children for the root. Can't make move: {}", col));
+                return Err(format!(
+                    "Was unable to generate children for the root. Can't make move: {}",
+                    col
+                ));
             }
         }
 
@@ -95,15 +87,22 @@ impl GameManager {
         }
 
         if !is_valid_col {
-            return Err(format!("The chosen column wasn't valid. Can't make move: {}", col));
+            return Err(format!(
+                "The chosen column wasn't valid. Can't make move: {}",
+                col
+            ));
         }
 
-        self.board_state.replace(self.board_state.take().narrow_possibilities(col).take());
+        self.board_state
+            .replace(self.board_state.take().narrow_possibilities(col).take());
         self.layer_generator = LayerGenerator::new(self.board_state.clone());
         Ok(())
     }
 
-    /// Returns a vector of moves and their corresponding scores
+    /// Returns a map of moves to their corresponding scores.
+    ///
+    /// Higher scores are better for the player about to make a move,
+    ///  lower scores are better for their opponent.
     pub fn get_move_scores(&self) -> HashMap<u8, isize> {
         let mut move_scores = HashMap::new();
 
@@ -129,7 +128,7 @@ impl GameManager {
         move_scores
     }
 
-    /// Returns whether the game is over, and if so who won
+    /// Returns whether the game is over, and if so who won.
     pub fn is_game_over(&self) -> GameOver {
         self.board_state.borrow().is_game_over()
     }
@@ -139,7 +138,7 @@ impl GameManager {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{game_manager::GameManager, tree_analysis::how_good_is, board_state::GameOver};
+    use crate::{board_state::GameOver, game_manager::GameManager, tree_analysis::how_good_is};
 
     #[test]
     fn board_translation() {

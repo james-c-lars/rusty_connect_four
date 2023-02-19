@@ -60,7 +60,7 @@ impl Board {
             .unwrap()
     }
 
-    /// Returns if the board is full
+    /// Returns if the board is full.
     pub fn is_full(&self) -> bool {
         for col in 0..BOARD_WIDTH {
             if self.get_height(col) != BOARD_HEIGHT {
@@ -72,7 +72,7 @@ impl Board {
 
     /// Used to initialize a board based on a 2d array.
     ///
-    /// It's meant to be used in internal testing functions and can have unexpected outputs.
+    /// If the board contains floating pieces, it will have unexpected results.
     pub fn from_arrays(arrays: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize]) -> Board {
         let mut board = Board::default();
 
@@ -91,6 +91,24 @@ impl Board {
         board
     }
 
+    /// Used to get the current state of the board as a 2d array.
+    pub fn to_arrays(&self) -> [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize] {
+        let mut position = [[0; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize];
+
+        for row in 0..BOARD_HEIGHT {
+            for col in 0..BOARD_WIDTH {
+                position[(BOARD_HEIGHT - 1 - row) as usize][col as usize] =
+                    match self.get_piece(col, row) {
+                        Ok(piece) => piece as u8 + 1,
+                        Err(_) => 0,
+                    };
+            }
+        }
+
+        position
+    }
+
+    /// Constructs a default empty board.
     pub const fn default_const() -> Board {
         Board {
             column_heights: [0; BOARD_WIDTH as usize],

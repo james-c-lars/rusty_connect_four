@@ -1,4 +1,4 @@
-use std::{rc::Rc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::board_state::{BoardState, GameOver};
 
@@ -35,7 +35,7 @@ impl LayerGenerator {
         }
     }
 
-    /// Constructs a new LayerGenerator for a given BoardState
+    /// Constructs a new LayerGenerator for a given BoardState.
     pub fn new(board: Rc<RefCell<BoardState>>) -> LayerGenerator {
         let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
 
@@ -52,7 +52,9 @@ impl LayerGenerator {
     /// Helper function for use in creating a new LayerGenerator.
     ///
     /// Returns a tuple of (previous_generation, new_generation).
-    fn get_bottom_two_layers(board: Rc<RefCell<BoardState>>) -> (Vec<Rc<RefCell<BoardState>>>, Vec<Rc<RefCell<BoardState>>>) {
+    fn get_bottom_two_layers(
+        board: Rc<RefCell<BoardState>>,
+    ) -> (Vec<Rc<RefCell<BoardState>>>, Vec<Rc<RefCell<BoardState>>>) {
         // bottom_layers will contain all games that still need children generated
         // This should only consist of one or two distinct generations
         // We can separate the generations via whose turn it is
@@ -184,7 +186,12 @@ mod tests {
             [0, 0, 0, 0, 0, 0, 1],
         ]);
 
-        assert_eq!(board_state.borrow().children[6].borrow().children[6].borrow().board, last_board);
+        assert_eq!(
+            board_state.borrow().children[6].borrow().children[6]
+                .borrow()
+                .board,
+            last_board
+        );
 
         let board_state = RefCell::new(BoardState::default());
         let first_generation = vec![board_state.into()];
@@ -297,7 +304,7 @@ mod tests {
             (2 * SOME_NUMBER * BOARD_WIDTH) as usize
         );
 
-        let (previous, new) =LayerGenerator::get_bottom_two_layers(board_state.clone());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH - 8) as usize);
         assert_eq!(new.len(), (2 * SOME_NUMBER * BOARD_WIDTH) as usize);
@@ -311,7 +318,9 @@ mod tests {
             layer_generator.next();
         }
 
-        let previous_depth = layer_generator.get_previous_generation()[0].borrow().get_depth();
+        let previous_depth = layer_generator.get_previous_generation()[0]
+            .borrow()
+            .get_depth();
         for previous_state in layer_generator.get_previous_generation().iter() {
             assert_eq!(previous_state.borrow().get_depth(), previous_depth);
         }

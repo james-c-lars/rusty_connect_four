@@ -22,7 +22,7 @@ impl<T> CircleBuffer<T>
 where
     T: Iterator<Item = Result<bool, OutOfBounds>>,
 {
-    /// Creates a CircleBuffer using a board iterator
+    /// Creates a CircleBuffer using a board iterator.
     fn new(mut iter: T) -> CircleBuffer<T> {
         let mut buffer = [Err(OutOfBounds); NUMBER_TO_WIN as usize];
         let mut piece_counts = [0; 2];

@@ -1,4 +1,4 @@
-use std::{rc::Rc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     board::{Board, FullColumn},
@@ -67,6 +67,7 @@ impl BoardState {
         }
     }
 
+    /// Constructs a board state of an empty board.
     pub const fn default_const() -> BoardState {
         BoardState {
             board: Board::default_const(),
@@ -95,7 +96,8 @@ impl BoardState {
                 continue;
             } else {
                 // We then add a new BoardState corresponding to the move just played
-                self.children.push(RefCell::new(BoardState::new(new_board, !turn, col)).into());
+                self.children
+                    .push(RefCell::new(BoardState::new(new_board, !turn, col)).into());
 
                 // We now refresh the board we're using
                 new_board = self.board.clone();
@@ -144,7 +146,7 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
-    use std::{rc::Rc, cell::RefCell};
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
         board::{Board, OutOfBounds},
@@ -174,7 +176,10 @@ mod tests {
             assert_eq!(child.borrow().board.get_piece(i as u8, 0).unwrap(), false);
         }
 
-        assert_eq!(board_state.children[3].borrow().board.get_piece(3, 4), Ok(false));
+        assert_eq!(
+            board_state.children[3].borrow().board.get_piece(3, 4),
+            Ok(false)
+        );
 
         let board = Board::from_arrays([
             [2, 0, 2, 1, 2, 2, 2],
@@ -194,7 +199,11 @@ mod tests {
             assert_eq!(child.borrow().children.len(), 0);
 
             assert_eq!(
-                child.borrow().board.get_piece(child.borrow().get_last_move(), 5).unwrap(),
+                child
+                    .borrow()
+                    .board
+                    .get_piece(child.borrow().get_last_move(), 5)
+                    .unwrap(),
                 true
             );
         }
@@ -217,7 +226,11 @@ mod tests {
             assert_eq!(child.borrow().children.len(), 0);
 
             assert_eq!(
-                child.borrow().board.get_piece(child.borrow().get_last_move(), 5).unwrap(),
+                child
+                    .borrow()
+                    .board
+                    .get_piece(child.borrow().get_last_move(), 5)
+                    .unwrap(),
                 false
             );
         }
@@ -287,7 +300,8 @@ mod tests {
         ]);
 
         for i in 0..BOARD_WIDTH {
-            let mut board_state: Rc<RefCell<BoardState>> = RefCell::new(BoardState::new(board.clone(), false, 3)).into();
+            let mut board_state: Rc<RefCell<BoardState>> =
+                RefCell::new(BoardState::new(board.clone(), false, 3)).into();
             for child in board_state.borrow_mut().generate_children() {
                 child.borrow_mut().generate_children();
             }
