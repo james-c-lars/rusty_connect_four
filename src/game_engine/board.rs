@@ -1,4 +1,4 @@
-use crate::game_engine::consts::{BOARD_HEIGHT, BOARD_WIDTH};
+use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
 /// An error state when accessing a nonexistant piece.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -119,8 +119,8 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::game_engine::{
-        board::{Board, FullColumn, OutOfBounds},
+    use crate::{
+        game_engine::board::{Board, FullColumn, OutOfBounds},
         consts::{BOARD_HEIGHT, BOARD_WIDTH},
     };
 

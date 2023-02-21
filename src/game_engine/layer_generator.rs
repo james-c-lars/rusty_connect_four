@@ -143,7 +143,10 @@ impl Iterator for LayerGenerator {
 mod tests {
     use std::{cell::RefCell, rc::Rc};
 
-    use crate::game_engine::{board::Board, board_state::BoardState, consts::BOARD_WIDTH};
+    use crate::{
+        game_engine::{board::Board, board_state::BoardState},
+        consts::BOARD_WIDTH,
+    };
 
     use super::LayerGenerator;
 

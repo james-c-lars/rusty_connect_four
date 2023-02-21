@@ -1,12 +1,17 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::game_engine::{
-    board::Board,
-    board_state::{BoardState, GameOver},
+use crate::{
+    game_engine::{
+        board::Board,
+        board_state::BoardState,
+        layer_generator::LayerGenerator,
+        tree_analysis::how_good_is,
+    },
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
-    layer_generator::LayerGenerator,
-    tree_analysis::how_good_is,
 };
+
+// Reexport GameOver
+pub use crate::game_engine::board_state::GameOver;
 
 #[derive(Debug)]
 pub struct GameManager {
@@ -52,7 +57,7 @@ impl GameManager {
     }
 
     /// Generates up to x board states in the decision tree.
-    pub fn generate_x_states(&mut self, x: isize) {
+    pub fn generate_x_states(&mut self, x: usize) {
         for _ in 0..x {
             if let None = self.layer_generator.next() {
                 break;

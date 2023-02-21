@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 
-use crate::game_engine::{
-    board::{Board, OutOfBounds},
+use crate::{
+    game_engine::board::{Board, OutOfBounds},
     consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN},
 };
 

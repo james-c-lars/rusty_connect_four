@@ -1,7 +1,6 @@
 mod board;
 mod board_iters;
 mod board_state;
-pub mod consts;
 pub mod game_manager;
 mod heuristics;
 mod layer_generator;

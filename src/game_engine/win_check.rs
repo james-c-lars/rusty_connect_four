@@ -1,5 +1,5 @@
-use crate::game_engine::{
-    board::{Board, OutOfBounds},
+use crate::{
+    game_engine::board::{Board, OutOfBounds},
     consts::NUMBER_TO_WIN,
 };
 

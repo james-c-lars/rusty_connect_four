@@ -1,7 +1,10 @@
-use crate::game_engine::{
-    board::{Board, OutOfBounds},
-    consts::{NUMBER_TO_WIN, SCALING_HEURISTIC},
+use crate::{
+    game_engine::board::{Board, OutOfBounds},
+    consts::{NUMBER_TO_WIN},
 };
+
+/// Used to define how much better an X in a row is to a X-1 in a row.
+pub const SCALING_HEURISTIC: isize = 10;
 
 /// A circular buffer used to iterate through all sets of four pieces
 ///  in a given iterator.
