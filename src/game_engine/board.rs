@@ -120,8 +120,8 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use crate::{
-        game_engine::board::{Board, FullColumn, OutOfBounds},
         consts::{BOARD_HEIGHT, BOARD_WIDTH},
+        game_engine::board::{Board, FullColumn, OutOfBounds},
     };
 
     #[test]

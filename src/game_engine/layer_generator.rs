@@ -144,8 +144,8 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
-        game_engine::{board::Board, board_state::BoardState},
         consts::BOARD_WIDTH,
+        game_engine::{board::Board, board_state::BoardState},
     };
 
     use super::LayerGenerator;

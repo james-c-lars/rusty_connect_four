@@ -1,6 +1,6 @@
 use crate::{
-    game_engine::board::{Board, OutOfBounds},
     consts::NUMBER_TO_WIN,
+    game_engine::board::{Board, OutOfBounds},
 };
 
 /// Returns whether the given color has won in the given board state.

@@ -1,8 +1,10 @@
-use std::{sync::{
-    Mutex,
-    Arc,
-    mpsc::{Sender, Receiver},
-}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{Receiver, Sender},
+        Arc, Mutex,
+    },
+};
 
 use egui::Context;
 
@@ -36,12 +38,12 @@ impl ComputerState {
     pub fn new(
         ctx: Context,
         sender: Sender<ComputerMessage>,
-        receiver: Receiver<UIMessage>
+        receiver: Receiver<UIMessage>,
     ) -> Self {
         Self {
             ctx,
             sender,
-            receiver
+            receiver,
         }
     }
 }
@@ -67,35 +69,40 @@ pub fn computer_process(state: Arc<Mutex<ComputerState>>) {
 
                     None
                 }
-            },
+            }
         };
 
         if let Some(message) = possible_message {
             match message {
                 UIMessage::MakeMove(column) => {
-                    state.lock().unwrap().sender.send(
-                        match manager.make_move(column as u8) {
+                    state
+                        .lock()
+                        .unwrap()
+                        .sender
+                        .send(match manager.make_move(column as u8) {
                             Ok(_) => {
                                 // Guessing how many nodes are left
-                                nodes_generated /= 7;
+                                nodes_generated /= 7; // TODO: Actually recalculate this value
 
                                 ComputerMessage::MoveMade {
                                     game_state: manager.is_game_over(),
                                     move_scores: manager.get_move_scores(),
                                 }
-                            },
+                            }
                             Err(_) => ComputerMessage::InvalidMove,
-                        }
-                    ).unwrap();
+                        })
+                        .expect(
+                            format!("Sending response to MakeMove({}) failed", column).as_str(),
+                        );
 
                     // Poking the main thread to get it to process the message in a
                     // timely manner
                     state.lock().unwrap().ctx.request_repaint();
-                },
+                }
                 UIMessage::ResetGame => {
                     manager = GameManager::new_game();
                     nodes_generated = 0;
-                },
+                }
             }
         }
     }

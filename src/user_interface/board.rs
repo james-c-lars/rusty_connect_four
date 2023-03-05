@@ -1,4 +1,4 @@
-use egui::{Pos2, Ui, Color32, Context, Rect, Id, Response, Sense, Stroke, Rounding};
+use egui::{Color32, Context, Id, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui};
 
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
@@ -7,11 +7,22 @@ const PIECE_RADIUS: f32 = 37.5;
 const PIECE_SPACING: f32 = 90.0;
 
 /// The states a piece can be in
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum PieceState {
-    #[default] Empty,
+    #[default]
+    Empty,
     PlayerOne,
     PlayerTwo,
+}
+
+impl PieceState {
+    pub fn reverse(&self) -> PieceState {
+        match self {
+            PieceState::Empty => panic!("Tried to reverse an empty piece"),
+            PieceState::PlayerOne => PieceState::PlayerTwo,
+            PieceState::PlayerTwo => PieceState::PlayerOne,
+        }
+    }
 }
 
 /// Represents a piece on the game board
@@ -37,13 +48,20 @@ impl Piece {
         let half_spacing = PIECE_SPACING / 2.0;
         let center = Pos2 {
             x: self.position.x + half_spacing,
-            y: self.position.y + half_spacing
+            y: self.position.y + half_spacing,
         };
         painter.circle_filled(center, PIECE_RADIUS, color);
 
         let accent_radius = PIECE_RADIUS * 2.0 / 3.0;
         let accent_width = PIECE_RADIUS / 6.0;
-        painter.circle_stroke(center, accent_radius, Stroke { width: accent_width, color: accent_color });
+        painter.circle_stroke(
+            center,
+            accent_radius,
+            Stroke {
+                width: accent_width,
+                color: accent_color,
+            },
+        );
     }
 }
 
@@ -76,8 +94,8 @@ impl Column {
                 min: position,
                 max: Pos2 {
                     x: position.x + PIECE_SPACING,
-                    y: position.y + PIECE_SPACING * (BOARD_HEIGHT as f32)
-                }
+                    y: position.y + PIECE_SPACING * (BOARD_HEIGHT as f32),
+                },
             },
             height: 0,
         }
@@ -97,7 +115,10 @@ impl Default for Column {
         Self {
             pieces: Default::default(),
             id: Id::new(""),
-            rect: Rect { min: Pos2::default(), max: Pos2::default() },
+            rect: Rect {
+                min: Pos2::default(),
+                max: Pos2::default(),
+            },
             height: 0,
         }
     }
@@ -125,7 +146,10 @@ impl Board {
 
         for i in 0..columns.len() {
             columns[i] = Column::new(
-                Id::new(ColumnId { board_id: id, index: i }),
+                Id::new(ColumnId {
+                    board_id: id,
+                    index: i,
+                }),
                 Pos2 {
                     x: position.x + PIECE_SPACING * (i as f32),
                     y: position.y + PIECE_SPACING,
@@ -146,14 +170,17 @@ impl Board {
                     y: position.y + PIECE_SPACING * (BOARD_HEIGHT as f32 + 1.0),
                 },
             },
-            floater: Piece { state: PieceState::PlayerOne, position },
+            floater: Piece {
+                state: PieceState::PlayerOne,
+                position,
+            },
             locked: false,
             animating_floater: false,
         }
     }
 
     /// Renders the board and adds the on_click callback
-    /// 
+    ///
     /// Returns an iterator of column indices and their responses
     pub fn render(
         &mut self,
@@ -174,14 +201,14 @@ impl Board {
             if self.locked {
                 continue;
             }
-            
+
             // Floater logic
             if response.hovered() {
                 hovering = true;
                 self.floater.position.x = ctx.animate_value_with_time(
                     self.id,
                     self.rect.min.x + PIECE_SPACING * (index as f32),
-                    0.25
+                    0.25,
                 );
             }
 
@@ -216,7 +243,7 @@ impl Board {
         self.floater.position.x = ctx.animate_value_with_time(
             self.id,
             self.rect.min.x + PIECE_SPACING * (column as f32),
-            time
+            time,
         );
     }
 
@@ -230,5 +257,8 @@ impl Board {
 
         self.columns[column].pieces[(BOARD_HEIGHT as usize) - 1 - height].state = player;
         self.columns[column].height += 1;
+
+        // The floater represents the next player's move
+        self.floater.state = player.reverse();
     }
 }

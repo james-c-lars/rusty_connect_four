@@ -1,8 +1,8 @@
 use std::cmp::{max, min};
 
 use crate::{
-    game_engine::board::{Board, OutOfBounds},
     consts::{BOARD_HEIGHT, BOARD_WIDTH, NUMBER_TO_WIN},
+    game_engine::board::{Board, OutOfBounds},
 };
 
 /// Iterates through a single horizontal strip of a board.

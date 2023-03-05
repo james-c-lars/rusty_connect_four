@@ -1,6 +1,6 @@
 use crate::{
+    consts::NUMBER_TO_WIN,
     game_engine::board::{Board, OutOfBounds},
-    consts::{NUMBER_TO_WIN},
 };
 
 /// Used to define how much better an X in a row is to a X-1 in a row.

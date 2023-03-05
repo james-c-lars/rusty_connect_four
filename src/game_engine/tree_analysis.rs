@@ -72,7 +72,9 @@ mod tests {
         rc::Rc,
     };
 
-    use crate::game_engine::{board::Board, board_state::BoardState, layer_generator::LayerGenerator};
+    use crate::game_engine::{
+        board::Board, board_state::BoardState, layer_generator::LayerGenerator,
+    };
 
     use super::how_good_is;
 
