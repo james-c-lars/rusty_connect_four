@@ -1,10 +1,75 @@
-use egui::{Color32, Context, Id, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui};
+use egui::{
+    Color32, Context, Id, Painter, Pos2, Rect, Response, Rounding, Sense, Shape, Stroke, Ui,
+};
 
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
 /// The size a piece takes up
-const PIECE_RADIUS: f32 = 37.5;
+const PIECE_RADIUS: f32 = 38.0;
+/// The space between pieces
 const PIECE_SPACING: f32 = 90.0;
+/// Half of the piece spacing, used for centering things
+const HALF_SPACING: f32 = PIECE_SPACING / 2.0;
+
+/// How fast a piece falls down a single row
+const FALLING_SPEED: f32 = 0.12;
+
+/// The set of points for triangles used to display the background
+const BACKGROUND_TRIANGLES: [[Pos2; 3]; 4] = [
+    [
+        Pos2 { x: 0.0, y: 0.0 },
+        Pos2 {
+            x: HALF_SPACING,
+            y: 0.0,
+        },
+        Pos2 {
+            x: 0.0,
+            y: HALF_SPACING,
+        },
+    ],
+    [
+        Pos2 {
+            x: PIECE_SPACING,
+            y: 0.0,
+        },
+        Pos2 {
+            x: HALF_SPACING,
+            y: 0.0,
+        },
+        Pos2 {
+            x: PIECE_SPACING,
+            y: HALF_SPACING,
+        },
+    ],
+    [
+        Pos2 {
+            x: PIECE_SPACING,
+            y: PIECE_SPACING,
+        },
+        Pos2 {
+            x: HALF_SPACING,
+            y: PIECE_SPACING,
+        },
+        Pos2 {
+            x: PIECE_SPACING,
+            y: HALF_SPACING,
+        },
+    ],
+    [
+        Pos2 {
+            x: 0.0,
+            y: PIECE_SPACING,
+        },
+        Pos2 {
+            x: HALF_SPACING,
+            y: PIECE_SPACING,
+        },
+        Pos2 {
+            x: 0.0,
+            y: HALF_SPACING,
+        },
+    ],
+];
 
 /// The states a piece can be in
 #[derive(Default, Clone, Copy)]
@@ -29,26 +94,23 @@ impl PieceState {
 #[derive(Default)]
 struct Piece {
     state: PieceState,
-
-    /// The top left corner of the piece
-    position: Pos2,
+    /// The top left corner of where the piece will end up
+    board_position: Pos2,
+    /// The top left corner of where the piece currently is
+    piece_position: Pos2,
 }
 
 impl Piece {
-    /// Visually displays the piece
-    fn render(&self, ui: &mut Ui) {
+    fn render_piece(&self, painter: &Painter) {
         let (color, accent_color) = match self.state {
-            PieceState::Empty => (Color32::BLACK, Color32::BLACK),
+            PieceState::Empty => return,
             PieceState::PlayerOne => (Color32::RED, Color32::DARK_RED),
             PieceState::PlayerTwo => (Color32::BLUE, Color32::DARK_BLUE),
         };
 
-        let painter = ui.painter();
-
-        let half_spacing = PIECE_SPACING / 2.0;
         let center = Pos2 {
-            x: self.position.x + half_spacing,
-            y: self.position.y + half_spacing,
+            x: self.piece_position.x + HALF_SPACING,
+            y: self.piece_position.y + HALF_SPACING,
         };
         painter.circle_filled(center, PIECE_RADIUS, color);
 
@@ -63,6 +125,33 @@ impl Piece {
             },
         );
     }
+
+    fn render_background(&self, painter: &Painter) {
+        let center = Pos2 {
+            x: self.board_position.x + HALF_SPACING,
+            y: self.board_position.y + HALF_SPACING,
+        };
+
+        painter.circle_stroke(
+            center,
+            PIECE_RADIUS,
+            Stroke {
+                width: 2.0 * (HALF_SPACING - PIECE_RADIUS),
+                color: Color32::YELLOW,
+            },
+        );
+
+        // Offseting the paths by the piece's position on the board
+        for mut path in BACKGROUND_TRIANGLES.clone() {
+            for point in path.iter_mut() {
+                point.x += self.board_position.x;
+                point.y += self.board_position.y;
+            }
+
+            let shape = Shape::convex_polygon(path.into(), Color32::YELLOW, Stroke::NONE);
+            painter.add(shape);
+        }
+    }
 }
 
 struct Column {
@@ -75,21 +164,9 @@ struct Column {
 impl Column {
     /// Creates a column, starting from a position
     fn new(id: Id, position: Pos2) -> Column {
-        let mut pieces: [Piece; BOARD_HEIGHT as usize] = Default::default();
-
-        let mut piece_pos = position;
-        for i in 0..(BOARD_HEIGHT as usize) {
-            pieces[i] = Piece {
-                state: PieceState::Empty,
-                position: piece_pos,
-            };
-
-            piece_pos.y += PIECE_SPACING;
-        }
-
-        Column {
+        let mut new_column = Column {
             id,
-            pieces,
+            pieces: Default::default(),
             rect: Rect {
                 min: position,
                 max: Pos2 {
@@ -98,15 +175,37 @@ impl Column {
                 },
             },
             height: 0,
+        };
+
+        let mut piece_pos = position;
+        for i in 0..(BOARD_HEIGHT as usize) {
+            piece_pos.y = new_column.get_y_position_of_piece(i);
+
+            new_column.pieces[i] = Piece {
+                state: PieceState::Empty,
+                board_position: piece_pos.clone(),
+                piece_position: position,
+            };
         }
+
+        new_column
     }
 
     fn render(&self, ui: &mut Ui) -> Response {
+        let painter = ui.painter();
+
         for piece in self.pieces.iter() {
-            piece.render(ui);
+            piece.render_piece(painter);
+        }
+        for piece in self.pieces.iter() {
+            piece.render_background(painter);
         }
 
         ui.interact(self.rect, self.id, Sense::click().union(Sense::hover()))
+    }
+
+    fn get_y_position_of_piece(&self, row: usize) -> f32 {
+        row as f32 * PIECE_SPACING + self.rect.min.y
     }
 }
 
@@ -137,6 +236,7 @@ pub struct Board {
     floater: Piece,
     animating_floater: bool,
     locked: bool,
+    falling_piece: Option<[usize; 2]>,
 }
 
 impl Board {
@@ -172,10 +272,12 @@ impl Board {
             },
             floater: Piece {
                 state: PieceState::PlayerOne,
-                position,
+                board_position: position,
+                piece_position: position,
             },
             locked: false,
             animating_floater: false,
+            falling_piece: None,
         }
     }
 
@@ -187,9 +289,24 @@ impl Board {
         ctx: &Context,
         ui: &mut Ui,
     ) -> impl Iterator<Item = (usize, Response)> {
-        // Paint background
-        let painter = ui.painter();
-        painter.rect_filled(self.rect, Rounding::none(), Color32::YELLOW);
+        // Updating the position of a piece that is falling
+        if let Some([column, row]) = self.falling_piece {
+            let final_y_position = self.columns[column].get_y_position_of_piece(row);
+            let current_y_position = ctx.animate_value_with_time(
+                Id::new(ColumnId {
+                    board_id: self.id,
+                    index: column,
+                }),
+                final_y_position,
+                FALLING_SPEED * (row as f32),
+            );
+
+            self.columns[column].pieces[row].piece_position.y = current_y_position;
+
+            if current_y_position == final_y_position {
+                self.falling_piece = None;
+            }
+        }
 
         // Paint columns
         let mut hovering = false;
@@ -198,14 +315,14 @@ impl Board {
             let response = column.render(ui);
 
             // We don't want a locked board to be interactive
-            if self.locked {
+            if self.locked || self.falling_piece.is_some() {
                 continue;
             }
 
             // Floater logic
             if response.hovered() {
                 hovering = true;
-                self.floater.position.x = ctx.animate_value_with_time(
+                self.floater.piece_position.x = ctx.animate_value_with_time(
                     self.id,
                     self.rect.min.x + PIECE_SPACING * (index as f32),
                     0.25,
@@ -218,7 +335,7 @@ impl Board {
 
         // Paint floater
         if hovering || self.animating_floater {
-            self.floater.render(ui);
+            self.floater.render_piece(ui.painter());
         }
 
         responses.into_iter().enumerate()
@@ -227,7 +344,7 @@ impl Board {
     /// Makes the board non-interactable
     pub fn lock(&mut self) {
         self.locked = true;
-        self.floater.position.x = self.rect.min.x;
+        self.floater.piece_position.x = self.rect.min.x;
     }
 
     /// Makes the board interactable
@@ -240,7 +357,7 @@ impl Board {
     pub fn float_piece(&mut self, ctx: &Context, column: usize, time: f32) {
         self.animating_floater = true;
 
-        self.floater.position.x = ctx.animate_value_with_time(
+        self.floater.piece_position.x = ctx.animate_value_with_time(
             self.id,
             self.rect.min.x + PIECE_SPACING * (column as f32),
             time,
@@ -248,15 +365,28 @@ impl Board {
     }
 
     /// Drops a piece down the given column
-    pub fn drop_piece(&mut self, column: usize, player: PieceState) {
+    pub fn drop_piece(&mut self, ctx: &Context, column: usize, player: PieceState) {
         let height = self.columns[column].height;
 
         if height >= (BOARD_HEIGHT as usize) {
             panic!("Trying to drop a piece down a full column: {}", column);
         }
 
-        self.columns[column].pieces[(BOARD_HEIGHT as usize) - 1 - height].state = player;
+        let row_index = (BOARD_HEIGHT as usize) - 1 - height;
+        self.columns[column].pieces[row_index].state = player;
         self.columns[column].height += 1;
+
+        self.falling_piece = Some([column, row_index]);
+
+        // Setting the initial animation state for the piece
+        ctx.animate_value_with_time(
+            Id::new(ColumnId {
+                board_id: self.id,
+                index: column,
+            }),
+            self.columns[column].get_y_position_of_piece(0),
+            0.0,
+        );
 
         // The floater represents the next player's move
         self.floater.state = player.reverse();

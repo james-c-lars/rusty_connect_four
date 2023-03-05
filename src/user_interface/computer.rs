@@ -28,32 +28,16 @@ pub enum UIMessage {
     ResetGame,
 }
 
-pub struct ComputerState {
+pub fn computer_process(
     ctx: Context,
     sender: Sender<ComputerMessage>,
     receiver: Receiver<UIMessage>,
-}
-
-impl ComputerState {
-    pub fn new(
-        ctx: Context,
-        sender: Sender<ComputerMessage>,
-        receiver: Receiver<UIMessage>,
-    ) -> Self {
-        Self {
-            ctx,
-            sender,
-            receiver,
-        }
-    }
-}
-
-pub fn computer_process(state: Arc<Mutex<ComputerState>>) {
+) {
     let mut manager = GameManager::new_game();
     let mut nodes_generated: usize = 0;
 
     loop {
-        let possible_message = match state.lock().unwrap().receiver.try_recv() {
+        let possible_message = match receiver.try_recv() {
             // If there's a message in the tube we want to address it
             Ok(message) => Some(message),
             // Otherwise we need to choose whether to generate board states or wait
@@ -61,7 +45,7 @@ pub fn computer_process(state: Arc<Mutex<ComputerState>>) {
                 if nodes_generated >= MAX_NODES_GENERATED {
                     // If our tree is as big as we'll let it be already,
                     // we can wait for a message
-                    Some(state.lock().unwrap().receiver.recv().unwrap())
+                    Some(receiver.recv().unwrap())
                 } else {
                     // Otherwise we can use the time to continue to grow our tree
                     manager.generate_x_states(GENERATED_NODES_PER_ITERATION);
@@ -75,10 +59,7 @@ pub fn computer_process(state: Arc<Mutex<ComputerState>>) {
         if let Some(message) = possible_message {
             match message {
                 UIMessage::MakeMove(column) => {
-                    state
-                        .lock()
-                        .unwrap()
-                        .sender
+                    sender
                         .send(match manager.make_move(column as u8) {
                             Ok(_) => {
                                 // Guessing how many nodes are left
@@ -97,7 +78,7 @@ pub fn computer_process(state: Arc<Mutex<ComputerState>>) {
 
                     // Poking the main thread to get it to process the message in a
                     // timely manner
-                    state.lock().unwrap().ctx.request_repaint();
+                    ctx.request_repaint();
                 }
                 UIMessage::ResetGame => {
                     manager = GameManager::new_game();

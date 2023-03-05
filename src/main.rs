@@ -7,7 +7,7 @@ use std::sync::{
 
 use rusty_connect_four::user_interface::{
     board::{Board, PieceState},
-    computer::{computer_process, ComputerMessage, ComputerState, GameOver, UIMessage},
+    computer::{computer_process, ComputerMessage, GameOver, UIMessage},
 };
 
 pub struct App {
@@ -22,15 +22,10 @@ impl App {
         let (my_sender, computer_receiver) = channel();
         let (computer_sender, my_receiver) = channel();
 
-        let state = Arc::new(Mutex::new(ComputerState::new(
-            cc.egui_ctx.clone(),
-            computer_sender,
-            computer_receiver,
-        )));
+        let ctx_clone = cc.egui_ctx.clone();
 
-        let state_clone = state.clone();
         std::thread::spawn(move || {
-            computer_process(state_clone);
+            computer_process(ctx_clone, computer_sender, computer_receiver);
         });
 
         Self {
@@ -75,20 +70,15 @@ impl eframe::App for App {
 
             for (column, response) in self.board.render(ctx, ui) {
                 if response.clicked() {
-                    self.board.drop_piece(column, self.current_player);
+                    self.board.drop_piece(ctx, column, self.current_player);
                     self.board.lock();
 
                     self.sender
                         .send(UIMessage::MakeMove(column))
                         .expect(format!("Sending MakeMove({}) failed", column).as_str());
-
-                    break;
                 }
             }
         });
-
-        // Printing to the console to show that things have rerendered
-        println!(".");
     }
 }
 
