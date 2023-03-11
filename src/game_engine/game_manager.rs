@@ -3,13 +3,13 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
     game_engine::{
-        board::Board, board_state::BoardState, layer_generator::LayerGenerator,
-        tree_analysis::how_good_is,
+        board::Board, board_size::calculate_size, board_state::BoardState,
+        layer_generator::LayerGenerator, tree_analysis::how_good_is,
     },
 };
 
 // Reexport GameOver
-pub use crate::game_engine::board_state::GameOver;
+pub use crate::game_engine::{board_size::BoardSize, board_state::GameOver};
 
 #[derive(Debug)]
 pub struct GameManager {
@@ -134,6 +134,11 @@ impl GameManager {
     /// Returns whether the game is over, and if so who won.
     pub fn is_game_over(&self) -> GameOver {
         self.board_state.borrow().is_game_over()
+    }
+
+    /// Returns the size and depth of the board.
+    pub fn size(&self) -> BoardSize {
+        calculate_size(self.board_state.clone())
     }
 }
 

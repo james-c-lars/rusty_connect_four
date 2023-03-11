@@ -1,5 +1,6 @@
 mod board;
 mod board_iters;
+mod board_size;
 mod board_state;
 pub mod game_manager;
 mod heuristics;

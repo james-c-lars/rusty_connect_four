@@ -1,6 +1,4 @@
-use egui::{
-    Color32, Context, Id, Painter, Pos2, Rect, Response, Rounding, Sense, Shape, Stroke, Ui,
-};
+use egui::{Color32, Context, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, Ui};
 
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 

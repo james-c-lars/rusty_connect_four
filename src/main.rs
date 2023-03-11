@@ -1,9 +1,6 @@
-use eframe::{egui, epaint::CubicBezierShape};
-use egui::{Color32, Id, Pos2, Stroke};
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Arc, Mutex,
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
+
+use egui::{Id, Pos2};
 
 use rusty_connect_four::user_interface::{
     board::{Board, PieceState},
@@ -49,6 +46,7 @@ impl eframe::App for App {
                     EngineMessage::MoveMade {
                         game_state,
                         move_scores,
+                        board_size,
                     } => match game_state {
                         GameOver::NoWin => {
                             self.board.unlock();
@@ -68,7 +66,10 @@ impl eframe::App for App {
                         }
                     },
                     EngineMessage::InvalidMove => panic!("Invalid move!!!"),
-                    EngineMessage::MoveScoresUpdate(_) => (),
+                    EngineMessage::Update {
+                        move_scores,
+                        board_size,
+                    } => (),
                 }
             }
 

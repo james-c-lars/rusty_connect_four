@@ -1,21 +1,18 @@
 use std::{
     collections::HashMap,
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::mpsc::{Receiver, Sender},
 };
 
 use egui::Context;
 
 use crate::game_engine::game_manager::GameManager;
-pub use crate::game_engine::game_manager::GameOver;
+pub use crate::game_engine::game_manager::{BoardSize, GameOver};
 
 /// Stores what the maximum number of nodes we will allow to be generated
 /// in the engine.
 const MAX_NODES_GENERATED: usize = 1024 * 1024;
 /// Stores how many nodes we will generate at once. Higher numbers are more
-/// performant, but makes the UI less responsive.
+/// performant, but makes the interface less responsive.
 const GENERATED_NODES_PER_ITERATION: usize = 128;
 
 /// Messages that the engine can send to the UI.
@@ -23,9 +20,13 @@ pub enum EngineMessage {
     MoveMade {
         game_state: GameOver,
         move_scores: HashMap<u8, isize>,
+        board_size: BoardSize,
     },
     InvalidMove,
-    MoveScoresUpdate(HashMap<u8, isize>),
+    Update {
+        move_scores: HashMap<u8, isize>,
+        board_size: BoardSize,
+    },
 }
 
 /// Messages that the UI can send to the engine.
@@ -63,6 +64,13 @@ pub fn async_engine_process(
                     manager.generate_x_states(GENERATED_NODES_PER_ITERATION);
                     nodes_generated += GENERATED_NODES_PER_ITERATION;
 
+                    sender
+                        .send(EngineMessage::Update {
+                            move_scores: manager.get_move_scores(),
+                            board_size: manager.size(),
+                        })
+                        .expect(format!("Sending update failed!").as_str());
+
                     None
                 }
             }
@@ -76,12 +84,13 @@ pub fn async_engine_process(
                     sender
                         .send(match manager.make_move(column as u8) {
                             Ok(_) => {
-                                // Guessing how many nodes are left
-                                nodes_generated /= 7; // TODO: Actually recalculate this value
+                                let board_size = manager.size();
+                                nodes_generated = board_size.size;
 
                                 EngineMessage::MoveMade {
                                     game_state: manager.is_game_over(),
                                     move_scores: manager.get_move_scores(),
+                                    board_size,
                                 }
                             }
                             Err(_) => EngineMessage::InvalidMove,
