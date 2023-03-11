@@ -2,7 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::game_engine::board_state::{BoardState, GameOver};
 
-/// Iterator used to generate a BoardState decision tree.
+/// Iterator used to generate a BoardState decision tree. Each iteration will
+/// return how many new board states were generated.
 ///
 /// Iteration will stop when the decision tree is complete.
 #[derive(Debug)]
@@ -109,16 +110,18 @@ impl LayerGenerator {
 }
 
 impl Iterator for LayerGenerator {
-    type Item = ();
+    type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         // If there are still BoardStates in the previous generation, we can
         //  continue computing from there
         if let Some(board_state) = self.get_previous_generation().pop() {
-            self.get_new_generation()
-                .extend(board_state.borrow_mut().generate_children());
+            let generated_children = board_state.borrow_mut().generate_children();
+            let num_generated = generated_children.len();
 
-            Some(())
+            self.get_new_generation().extend(generated_children);
+
+            Some(num_generated)
         } else if self.get_new_generation().len() > 0 {
             // Otherwise, as long as there are a new set of BoardStates for
             //  us to compute children for, we can continue computing for
@@ -145,10 +148,8 @@ mod tests {
 
     use crate::{
         consts::BOARD_WIDTH,
-        game_engine::{board::Board, board_state::BoardState},
+        game_engine::{board::Board, board_state::BoardState, layer_generator::LayerGenerator},
     };
-
-    use super::LayerGenerator;
 
     #[test]
     fn layer_generator() {
@@ -161,7 +162,7 @@ mod tests {
             generation_1_is_new: false,
         };
 
-        assert_eq!(layer_generator.next(), Some(()));
+        assert!(layer_generator.next().is_some());
         assert_eq!(
             layer_generator.get_new_generation().len(),
             BOARD_WIDTH as usize
@@ -169,7 +170,7 @@ mod tests {
         assert_eq!(layer_generator.get_previous_generation().len(), 0);
 
         for i in 0..BOARD_WIDTH {
-            assert_eq!(layer_generator.next(), Some(()));
+            assert!(layer_generator.next().is_some());
             assert_eq!(
                 layer_generator.get_new_generation().len(),
                 (BOARD_WIDTH * (i + 1)) as usize
@@ -209,7 +210,7 @@ mod tests {
             layer_generator.next();
         }
 
-        assert_eq!(layer_generator.next(), Some(()));
+        assert!(layer_generator.next().is_some());
     }
 
     #[test]
@@ -334,5 +335,40 @@ mod tests {
         }
 
         assert_eq!(previous_depth + 1, new_depth);
+    }
+
+    #[test]
+    fn try_generate_counts_correctly() {
+        let board = Board::from_arrays([
+            [2, 2, 2, 1, 0, 2, 2],
+            [1, 1, 1, 2, 1, 1, 1],
+            [2, 2, 1, 1, 1, 2, 1],
+            [1, 1, 2, 2, 1, 1, 2],
+            [2, 2, 1, 1, 2, 2, 1],
+            [2, 2, 1, 1, 2, 1, 2],
+        ]);
+
+        let root = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+
+        let mut generator = LayerGenerator::new(root);
+
+        assert_eq!(generator.next(), Some(1));
+
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1],
+        ]);
+
+        let root = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+
+        let mut generator = LayerGenerator::new(root);
+
+        for _ in 0..(7 + 49 + 343) {
+            assert_eq!(generator.next(), Some(6));
+        }
     }
 }

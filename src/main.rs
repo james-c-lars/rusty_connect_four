@@ -51,6 +51,10 @@ impl eframe::App for App {
                         GameOver::NoWin => {
                             self.board.unlock();
                             self.current_player = self.current_player.reverse();
+                            println!(
+                                "Move Made - depth: {}, size: {}, memory: {}",
+                                board_size.depth, board_size.size, board_size.memory
+                            );
                         }
                         GameOver::Tie => {
                             println!("Tie!");
@@ -69,7 +73,10 @@ impl eframe::App for App {
                     EngineMessage::Update {
                         move_scores,
                         board_size,
-                    } => (),
+                    } => println!(
+                        "depth: {}, size: {}, memory: {}",
+                        board_size.depth, board_size.size, board_size.memory
+                    ),
                 }
             }
 

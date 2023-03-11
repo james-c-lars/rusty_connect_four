@@ -54,13 +54,22 @@ impl GameManager {
         self.board_state.borrow().board.to_arrays()
     }
 
-    /// Generates up to x board states in the decision tree.
-    pub fn generate_x_states(&mut self, x: usize) {
-        for _ in 0..x {
-            if let None = self.layer_generator.next() {
+    /// Generates approximately x board states in the decision tree. Will generate less than
+    /// x board states if the decision tree is completely explored.
+    ///
+    /// Returns the number of board states generated.
+    pub fn try_generate_x_states(&mut self, x: usize) -> usize {
+        let mut num_generated = 0;
+
+        while num_generated < x {
+            if let Some(num) = self.layer_generator.next() {
+                num_generated += num;
+            } else {
                 break;
             }
         }
+
+        num_generated
     }
 
     /// Drop a piece down the corresponding column.
@@ -72,7 +81,7 @@ impl GameManager {
 
         // We haven't yet generated the children of this board state
         if self.board_state.borrow().children.len() == 0 {
-            self.generate_x_states(1);
+            self.try_generate_x_states(1);
 
             if self.board_state.borrow().children.len() == 0 {
                 return Err(format!(
@@ -179,7 +188,7 @@ mod tests {
 
         let mut manager = GameManager::start_from_position(board_array, false, 0);
 
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let state = manager.board_state;
 
@@ -187,7 +196,7 @@ mod tests {
 
         let mut manager = GameManager::start_from_position(board_array, true, 0);
 
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let state = manager.board_state;
 
@@ -248,7 +257,7 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false, 0);
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
@@ -257,7 +266,7 @@ mod tests {
         assert_eq!(move_scores, real_move_scores);
 
         let mut manager = GameManager::start_from_position(board_array, true, 0);
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
@@ -275,7 +284,7 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false, 0);
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {
@@ -287,7 +296,7 @@ mod tests {
         }
 
         let mut manager = GameManager::start_from_position(board_array, true, 0);
-        manager.generate_x_states(10000);
+        manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {

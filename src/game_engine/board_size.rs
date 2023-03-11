@@ -7,7 +7,7 @@ use crate::game_engine::board_state::BoardState;
 pub struct BoardSize {
     pub depth: usize,
     pub size: usize,
-    pub memory_size: usize,
+    pub memory: usize,
 }
 
 /// Calculates numerical details about a decision tree.
@@ -32,7 +32,7 @@ pub fn calculate_size(root: Rc<RefCell<BoardState>>) -> BoardSize {
     BoardSize {
         depth,
         size,
-        memory_size: size * std::mem::size_of::<Rc<RefCell<BoardState>>>(),
+        memory: size * std::mem::size_of::<Rc<RefCell<BoardState>>>(),
     }
 }
 
