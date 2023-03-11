@@ -4,17 +4,17 @@ use egui::{
 
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
-/// The size a piece takes up
+/// The size a piece takes up.
 const PIECE_RADIUS: f32 = 38.0;
-/// The space between pieces
+/// The space between pieces.
 const PIECE_SPACING: f32 = 90.0;
-/// Half of the piece spacing, used for centering things
+/// Half of the piece spacing, used for centering things.
 const HALF_SPACING: f32 = PIECE_SPACING / 2.0;
 
-/// How fast a piece falls down a single row
+/// How fast a piece falls down a single row.
 const FALLING_SPEED: f32 = 0.12;
 
-/// The set of points for triangles used to display the background
+/// The set of points for triangles used to display the background.
 const BACKGROUND_TRIANGLES: [[Pos2; 3]; 4] = [
     [
         Pos2 { x: 0.0, y: 0.0 },
@@ -71,7 +71,9 @@ const BACKGROUND_TRIANGLES: [[Pos2; 3]; 4] = [
     ],
 ];
 
-/// The states a piece can be in
+/// A piece (or lack thereof) on the gameboard.
+///
+/// A piece can correspond to either player one or two.
 #[derive(Default, Clone, Copy)]
 pub enum PieceState {
     #[default]
@@ -81,6 +83,9 @@ pub enum PieceState {
 }
 
 impl PieceState {
+    /// Returns a piece corresponding to the opposite player.
+    ///
+    /// Panics if used on an empty piece.
     pub fn reverse(&self) -> PieceState {
         match self {
             PieceState::Empty => panic!("Tried to reverse an empty piece"),
@@ -90,17 +95,20 @@ impl PieceState {
     }
 }
 
-/// Represents a piece on the game board
+/// Represents a piece hole on the game board.
 #[derive(Default)]
 struct Piece {
     state: PieceState,
-    /// The top left corner of where the piece will end up
+    /// The top left corner of where the piece will end up.
     board_position: Pos2,
-    /// The top left corner of where the piece currently is
+    /// The top left corner of where the piece currently is.
+    ///
+    /// This will change as a piece falls into the final board position.
     piece_position: Pos2,
 }
 
 impl Piece {
+    /// Paints a piece onto the board.
     fn render_piece(&self, painter: &Painter) {
         let (color, accent_color) = match self.state {
             PieceState::Empty => return,
@@ -126,6 +134,10 @@ impl Piece {
         );
     }
 
+    /// Paints the a single piece hole of the board.
+    ///
+    /// A piece hole consists of four triangles, plus a border used to
+    /// smooth the edges of the triangles into a circular shape.
     fn render_background(&self, painter: &Painter) {
         let center = Pos2 {
             x: self.board_position.x + HALF_SPACING,
@@ -154,15 +166,19 @@ impl Piece {
     }
 }
 
+/// A column of the board.
 struct Column {
     pieces: [Piece; BOARD_HEIGHT as usize],
     id: Id,
+    /// The rectangular region that the column occupies.
     rect: Rect,
+    /// How many pieces currently are in the column.
     height: usize,
 }
 
 impl Column {
-    /// Creates a column, starting from a position
+    /// Creates a column, given a position that will serve as its
+    /// upper left corner.
     fn new(id: Id, position: Pos2) -> Column {
         let mut new_column = Column {
             id,
@@ -179,7 +195,7 @@ impl Column {
 
         let mut piece_pos = position;
         for i in 0..(BOARD_HEIGHT as usize) {
-            piece_pos.y = new_column.get_y_position_of_piece(i);
+            piece_pos.y = new_column.get_y_position_of_piece(i as f32);
 
             new_column.pieces[i] = Piece {
                 state: PieceState::Empty,
@@ -191,6 +207,9 @@ impl Column {
         new_column
     }
 
+    /// Renders a column and all the pieces contained in the column.
+    ///
+    /// Returns a response that allows for click and hover checking.
     fn render(&self, ui: &mut Ui) -> Response {
         let painter = ui.painter();
 
@@ -204,8 +223,10 @@ impl Column {
         ui.interact(self.rect, self.id, Sense::click().union(Sense::hover()))
     }
 
-    fn get_y_position_of_piece(&self, row: usize) -> f32 {
-        row as f32 * PIECE_SPACING + self.rect.min.y
+    /// Returns the y position that a piece should occupy given that it is
+    /// in a particular row of the column.
+    fn get_y_position_of_piece(&self, row: f32) -> f32 {
+        row * PIECE_SPACING + self.rect.min.y
     }
 }
 
@@ -223,24 +244,31 @@ impl Default for Column {
     }
 }
 
+/// A hashable struct used to create a distinct id for a column,
+/// based on a board ID and a column index.
 #[derive(Hash)]
 struct ColumnId {
     board_id: Id,
     index: usize,
 }
 
+/// A game board, consisting of six rows and seven columns.
 pub struct Board {
     columns: [Column; BOARD_WIDTH as usize],
     id: Id,
-    rect: Rect,
+    rect: Rect, // TODO: Possibly just change this to the position of the upper left corner
+    /// A piece that floats above the board to show where the user is pointing.
     floater: Piece,
+    /// Whether the floating piece is currently being externally animated.
     animating_floater: bool,
+    /// Whether the Board is currently interactable.
     locked: bool,
+    /// Contains the indices of a piece that is falling down the board.
     falling_piece: Option<[usize; 2]>,
 }
 
 impl Board {
-    /// Creates a new board given an Id and its upper left corner
+    /// Creates a new board given an Id and its upper left corner.
     pub fn new(id: Id, position: Pos2) -> Board {
         let mut columns: [Column; (BOARD_WIDTH as usize)] = Default::default();
 
@@ -281,9 +309,10 @@ impl Board {
         }
     }
 
-    /// Renders the board and adds the on_click callback
+    /// Renders the board and its corresponding pieces, as well as any piece animations.
     ///
-    /// Returns an iterator of column indices and their responses
+    /// Returns an iterator of column indices and their responses. The responses track
+    /// clicks and hovers.
     pub fn render(
         &mut self,
         ctx: &Context,
@@ -291,14 +320,15 @@ impl Board {
     ) -> impl Iterator<Item = (usize, Response)> {
         // Updating the position of a piece that is falling
         if let Some([column, row]) = self.falling_piece {
-            let final_y_position = self.columns[column].get_y_position_of_piece(row);
+            let final_y_position = self.columns[column].get_y_position_of_piece(row as f32);
             let current_y_position = ctx.animate_value_with_time(
                 Id::new(ColumnId {
                     board_id: self.id,
                     index: column,
                 }),
                 final_y_position,
-                FALLING_SPEED * (row as f32),
+                // + 1.0 for the fact that the piece is falling from above the board
+                FALLING_SPEED * (row as f32 + 1.0),
             );
 
             self.columns[column].pieces[row].piece_position.y = current_y_position;
@@ -341,19 +371,19 @@ impl Board {
         responses.into_iter().enumerate()
     }
 
-    /// Makes the board non-interactable
+    /// Makes the board non-interactable.
     pub fn lock(&mut self) {
         self.locked = true;
         self.floater.piece_position.x = self.rect.min.x;
     }
 
-    /// Makes the board interactable
+    /// Makes the board interactable.
     pub fn unlock(&mut self) {
         self.locked = false;
         self.animating_floater = false;
     }
 
-    /// Animates the floater over the given column
+    /// Animates the floater over the given column.
     pub fn float_piece(&mut self, ctx: &Context, column: usize, time: f32) {
         self.animating_floater = true;
 
@@ -364,8 +394,12 @@ impl Board {
         );
     }
 
-    /// Drops a piece down the given column
+    /// Drops a piece down the given column.
     pub fn drop_piece(&mut self, ctx: &Context, column: usize, player: PieceState) {
+        if self.falling_piece.is_some() {
+            panic!("Tried to drop a piece down the board, when one was already falling!");
+        }
+
         let height = self.columns[column].height;
 
         if height >= (BOARD_HEIGHT as usize) {
@@ -384,7 +418,8 @@ impl Board {
                 board_id: self.id,
                 index: column,
             }),
-            self.columns[column].get_y_position_of_piece(0),
+            // -1.0 due to the fact that the piece is falling from above the board
+            self.columns[column].get_y_position_of_piece(-1.0),
             0.0,
         );
 

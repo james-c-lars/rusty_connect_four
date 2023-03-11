@@ -7,25 +7,28 @@ use std::sync::{
 
 use rusty_connect_four::user_interface::{
     board::{Board, PieceState},
-    computer::{computer_process, ComputerMessage, GameOver, UIMessage},
+    engine_interface::{async_engine_process, EngineMessage, GameOver, UIMessage},
 };
 
+/// Stores the current state of the application.
 pub struct App {
     board: Board,
     sender: Sender<UIMessage>,
-    receiver: Receiver<ComputerMessage>,
+    receiver: Receiver<EngineMessage>,
     current_player: PieceState,
 }
 
 impl App {
+    /// Sets the initial state of the application.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let (my_sender, computer_receiver) = channel();
-        let (computer_sender, my_receiver) = channel();
+        // Setting up the engine interface in another thread
+        let (my_sender, engine_receiver) = channel();
+        let (engine_sender, my_receiver) = channel();
 
         let ctx_clone = cc.egui_ctx.clone();
 
         std::thread::spawn(move || {
-            computer_process(ctx_clone, computer_sender, computer_receiver);
+            async_engine_process(ctx_clone, engine_sender, engine_receiver);
         });
 
         Self {
@@ -40,9 +43,10 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            // Communicating with the engine
             if let Ok(message) = self.receiver.try_recv() {
                 match message {
-                    ComputerMessage::MoveMade {
+                    EngineMessage::MoveMade {
                         game_state,
                         move_scores,
                     } => match game_state {
@@ -63,11 +67,12 @@ impl eframe::App for App {
                             self.board.lock();
                         }
                     },
-                    ComputerMessage::InvalidMove => panic!("Invalid move!!!"),
-                    ComputerMessage::MoveScoresUpdate(_) => (),
+                    EngineMessage::InvalidMove => panic!("Invalid move!!!"),
+                    EngineMessage::MoveScoresUpdate(_) => (),
                 }
             }
 
+            // Generating the UI
             for (column, response) in self.board.render(ctx, ui) {
                 if response.clicked() {
                     self.board.drop_piece(ctx, column, self.current_player);
@@ -82,6 +87,7 @@ impl eframe::App for App {
     }
 }
 
+/// Runs the application.
 fn main() {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
