@@ -219,7 +219,7 @@ impl Column {
 
     /// Returns a response that allows for click and hover checking.
     ///
-    /// Will only have hover checking if the column is already full.
+    /// Will only have click checking if the column isn't full.
     fn response(&self, ui: &mut Ui) -> Response {
         let mut sense = Sense::hover();
         if self.height < BOARD_HEIGHT as usize {
@@ -326,8 +326,60 @@ impl Board {
         ui: &mut Ui,
     ) -> impl Iterator<Item = (usize, Response)> {
         // Updating the position of a piece that is falling
+        self.update_falling_piece(ctx);
+
+        // Paint columns
+        for column in self.columns.iter() {
+            column.render(ui);
+        }
+
+        if self.locked || self.falling_piece.is_some() {
+            // We don't want a locked board to be interactive
+            Vec::new().into_iter()
+        } else {
+            self.process_column_responses(ui, ctx)
+        }
+    }
+
+    /// Processes the column's responses and turns them into an iterator.
+    fn process_column_responses(
+        &mut self,
+        ui: &mut Ui,
+        ctx: &Context,
+    ) -> std::vec::IntoIter<(usize, Response)> {
+        let mut currently_hovering = false;
+        let mut responses = Vec::new();
+
+        for (index, column) in self.columns.iter().enumerate() {
+            let response = column.response(ui);
+
+            if response.hovered() {
+                currently_hovering = true;
+
+                // Animate the floater over the hovered column
+                self.floater.piece_position.x = ctx.animate_value_with_time(
+                    self.id,
+                    self.rect.min.x + PIECE_SPACING * (index as f32),
+                    0.25,
+                );
+            }
+
+            responses.push((index, response));
+        }
+
+        // Paint the floater if the user is interacting with the board
+        if currently_hovering || self.animating_floater {
+            self.floater.render_piece(ui.painter());
+        }
+
+        responses.into_iter()
+    }
+
+    /// If there is a falling piece, updates its position.
+    fn update_falling_piece(&mut self, ctx: &Context) {
         if let Some([column, row]) = self.falling_piece {
             let final_y_position = self.columns[column].get_y_position_of_piece(row as f32);
+
             let current_y_position = ctx.animate_value_with_time(
                 Id::new(ColumnId {
                     board_id: self.id,
@@ -344,40 +396,6 @@ impl Board {
                 self.falling_piece = None;
             }
         }
-
-        // Paint columns
-        let mut hovering = false;
-        let mut responses = Vec::new();
-        for (index, column) in self.columns.iter().enumerate() {
-            column.render(ui);
-
-            // We don't want a locked board to be interactive
-            if self.locked || self.falling_piece.is_some() {
-                continue;
-            }
-
-            let response = column.response(ui);
-
-            // Floater logic
-            if response.hovered() {
-                hovering = true;
-                self.floater.piece_position.x = ctx.animate_value_with_time(
-                    self.id,
-                    self.rect.min.x + PIECE_SPACING * (index as f32),
-                    0.25,
-                );
-            }
-
-            // External column clicked logic
-            responses.push((index, response));
-        }
-
-        // Paint floater
-        if hovering || self.animating_floater {
-            self.floater.render_piece(ui.painter());
-        }
-
-        responses.into_iter()
     }
 
     /// Makes the board non-interactable.
@@ -432,7 +450,8 @@ impl Board {
             0.0,
         );
 
-        // The floater represents the next player's move
+        // The floater represents the current player, so this indicates that it's
+        // the next player's move
         self.floater.state = player.reverse();
     }
 }

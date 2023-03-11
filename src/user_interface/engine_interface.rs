@@ -59,20 +59,19 @@ pub fn async_engine_process(
             // Otherwise we need to choose whether to generate board states or wait
             Err(_) => {
                 if nodes_generated >= MAX_NODES_ALLOWED || tree_complete {
+                    send_update(&sender, &manager);
+                    poke_main_thread(&ctx);
+
                     // If our tree is as big as we'll let it be already, we can block the thread
                     // and wait for a message
-                    send_update(&sender, &manager);
-
+                    // recv only fails if the other side has disconnected, in which case we want
+                    // to gracefully exit
                     match receiver.recv() {
                         Ok(message) => Some(message),
-                        Err(_) => break, // recv only fails if the other side has disconnected
+                        Err(_) => break,
                     }
                 } else {
-                    // Otherwise we can use the time to continue to grow our tree
-                    let current_generated =
-                        manager.try_generate_x_states(GENERATED_NODES_PER_ITERATION);
-                    tree_complete = current_generated < GENERATED_NODES_PER_ITERATION;
-                    nodes_generated += current_generated;
+                    grow_tree(&mut manager, &mut tree_complete, &mut nodes_generated);
 
                     None
                 }
@@ -82,29 +81,12 @@ pub fn async_engine_process(
         if let Some(message) = possible_message {
             match message {
                 UIMessage::MakeMove(column) => {
-                    // Telling the engine what move is played, as well as generating a response
-                    // for the UI
-                    let response = match manager.make_move(column as u8) {
-                        Ok(()) => {
-                            let board_size = manager.size();
-                            nodes_generated = board_size.size;
-
-                            EngineMessage::MoveMade {
-                                game_state: manager.is_game_over(),
-                                move_scores: manager.get_move_scores(),
-                                board_size,
-                            }
-                        }
-                        Err(_) => EngineMessage::InvalidMove,
-                    };
+                    let response = try_make_move(&mut manager, column, &mut nodes_generated);
 
                     sender.send(response).expect(
                         format!("Sending response to MakeMove({}) failed", column).as_str(),
                     );
-
-                    // Poking the main thread to get it to process the message in a
-                    // timely manner
-                    ctx.request_repaint();
+                    poke_main_thread(&ctx);
 
                     time_since_last_update = Instant::now();
                 }
@@ -120,16 +102,49 @@ pub fn async_engine_process(
         // Sending periodic updates to the UI
         if time_since_last_update.elapsed().as_secs() > 1 {
             send_update(&sender, &manager);
-            // Poking the main thread to get it to process the message in a
-            // timely manner
-            ctx.request_repaint();
+            poke_main_thread(&ctx);
 
             time_since_last_update = Instant::now();
         }
     }
 }
 
-/// Sends an update using the game manager.
+/// 'Pokes' the main thread to get it to rerender.
+///
+/// Used to ensure the UI responds to a message in a timely fashion.
+fn poke_main_thread(ctx: &Context) {
+    ctx.request_repaint();
+}
+
+/// Tries to make a move, and returns a response corresponding to if it was successful.
+fn try_make_move(
+    manager: &mut GameManager,
+    column: usize,
+    nodes_generated: &mut usize,
+) -> EngineMessage {
+    match manager.make_move(column as u8) {
+        Ok(()) => {
+            let board_size = manager.size();
+            *nodes_generated = board_size.size;
+
+            EngineMessage::MoveMade {
+                game_state: manager.is_game_over(),
+                move_scores: manager.get_move_scores(),
+                board_size,
+            }
+        }
+        Err(_) => EngineMessage::InvalidMove,
+    }
+}
+
+/// Grows the size of the decision tree.
+fn grow_tree(manager: &mut GameManager, tree_complete: &mut bool, nodes_generated: &mut usize) {
+    let current_generated = manager.try_generate_x_states(GENERATED_NODES_PER_ITERATION);
+    *tree_complete = current_generated < GENERATED_NODES_PER_ITERATION;
+    *nodes_generated += current_generated;
+}
+
+/// Sends an update to the UI of the current engine state.
 fn send_update(sender: &Sender<EngineMessage>, manager: &GameManager) {
     sender
         .send(EngineMessage::Update {
