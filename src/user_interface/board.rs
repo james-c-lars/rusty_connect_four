@@ -208,9 +208,7 @@ impl Column {
     }
 
     /// Renders a column and all the pieces contained in the column.
-    ///
-    /// Returns a response that allows for click and hover checking.
-    fn render(&self, ui: &mut Ui) -> Response {
+    fn render(&self, ui: &mut Ui) {
         let painter = ui.painter();
 
         for piece in self.pieces.iter() {
@@ -219,8 +217,18 @@ impl Column {
         for piece in self.pieces.iter() {
             piece.render_background(painter);
         }
+    }
 
-        ui.interact(self.rect, self.id, Sense::click().union(Sense::hover()))
+    /// Returns a response that allows for click and hover checking.
+    ///
+    /// Will only have hover checking if the column is already full.
+    fn response(&self, ui: &mut Ui) -> Response {
+        let mut sense = Sense::hover();
+        if self.height < BOARD_HEIGHT as usize {
+            sense = sense.union(Sense::click());
+        }
+
+        ui.interact(self.rect, self.id, sense)
     }
 
     /// Returns the y position that a piece should occupy given that it is
@@ -311,8 +319,9 @@ impl Board {
 
     /// Renders the board and its corresponding pieces, as well as any piece animations.
     ///
-    /// Returns an iterator of column indices and their responses. The responses track
-    /// clicks and hovers.
+    /// Returns an iterator of column indices and their responses. Full columns will only
+    /// allow for hover checking, while non-full columns will allow for both click and
+    /// hover checking.
     pub fn render(
         &mut self,
         ctx: &Context,
@@ -340,14 +349,16 @@ impl Board {
 
         // Paint columns
         let mut hovering = false;
-        let mut responses: Vec<Response> = Vec::new();
+        let mut responses = Vec::new();
         for (index, column) in self.columns.iter().enumerate() {
-            let response = column.render(ui);
+            column.render(ui);
 
             // We don't want a locked board to be interactive
             if self.locked || self.falling_piece.is_some() {
                 continue;
             }
+
+            let response = column.response(ui);
 
             // Floater logic
             if response.hovered() {
@@ -360,7 +371,7 @@ impl Board {
             }
 
             // External column clicked logic
-            responses.push(response);
+            responses.push((index, response));
         }
 
         // Paint floater
@@ -368,7 +379,7 @@ impl Board {
             self.floater.render_piece(ui.painter());
         }
 
-        responses.into_iter().enumerate()
+        responses.into_iter()
     }
 
     /// Makes the board non-interactable.
