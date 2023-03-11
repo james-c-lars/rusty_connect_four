@@ -69,7 +69,7 @@ impl eframe::App for App {
                             self.board.lock();
                         }
                     },
-                    EngineMessage::InvalidMove => panic!("Invalid move!!!"),
+                    EngineMessage::InvalidMove(error) => panic!("{}", error),
                     EngineMessage::Update {
                         move_scores,
                         board_size,

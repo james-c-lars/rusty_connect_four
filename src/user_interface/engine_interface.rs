@@ -23,7 +23,7 @@ pub enum EngineMessage {
         move_scores: HashMap<u8, isize>,
         board_size: BoardSize,
     },
-    InvalidMove,
+    InvalidMove(String),
     Update {
         move_scores: HashMap<u8, isize>,
         board_size: BoardSize,
@@ -133,7 +133,7 @@ fn try_make_move(
                 board_size,
             }
         }
-        Err(_) => EngineMessage::InvalidMove,
+        Err(error_message) => EngineMessage::InvalidMove(error_message),
     }
 }
 
