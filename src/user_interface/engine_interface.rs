@@ -14,11 +14,11 @@ pub use crate::game_engine::game_manager::{BoardSize, GameOver};
 const MAX_NODES_ALLOWED: usize = 4 * 1024 * 1024;
 /// Stores how many nodes we will generate at once. Higher numbers are more
 /// performant, but makes the interface less responsive.
-const GENERATED_NODES_PER_ITERATION: usize = 64 * 1024;
+const GENERATED_NODES_PER_ITERATION: usize = 16 * 1024;
 
 /// Messages that the engine can send to the UI.
 pub enum EngineMessage {
-    MoveMade {
+    MoveReceipt {
         game_state: GameOver,
         move_scores: HashMap<u8, isize>,
         board_size: BoardSize,
@@ -34,6 +34,7 @@ pub enum EngineMessage {
 pub enum UIMessage {
     MakeMove(usize),
     ResetGame,
+    RequestUpdate,
 }
 
 /// A process meant to be run asynchronously from the UI.
@@ -87,13 +88,16 @@ pub fn async_engine_process(
                         format!("Sending response to MakeMove({}) failed", column).as_str(),
                     );
                     poke_main_thread(&ctx);
-
                     time_since_last_update = Instant::now();
                 }
                 UIMessage::ResetGame => {
                     manager = GameManager::new_game();
                     nodes_generated = 0;
                     tree_complete = false;
+                }
+                UIMessage::RequestUpdate => {
+                    send_update(&sender, &manager);
+                    poke_main_thread(&ctx);
                     time_since_last_update = Instant::now();
                 }
             }
@@ -127,7 +131,7 @@ fn try_make_move(
             let board_size = manager.size();
             *nodes_generated = board_size.size;
 
-            EngineMessage::MoveMade {
+            EngineMessage::MoveReceipt {
                 game_state: manager.is_game_over(),
                 move_scores: manager.get_move_scores(),
                 board_size,

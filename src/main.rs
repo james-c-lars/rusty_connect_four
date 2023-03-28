@@ -1,10 +1,15 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
 use egui::{Id, Pos2};
 
 use rusty_connect_four::user_interface::{
-    board::{Board, PieceState},
-    engine_interface::{async_engine_process, EngineMessage, GameOver, UIMessage},
+    board::Board,
+    engine_interface::{async_engine_process, BoardSize, EngineMessage, UIMessage},
+    settings::Settings,
+    turn_manager::TurnManager,
 };
 
 /// Stores the current state of the application.
@@ -12,7 +17,10 @@ pub struct App {
     board: Board,
     sender: Sender<UIMessage>,
     receiver: Receiver<EngineMessage>,
-    current_player: PieceState,
+    settings: Settings,
+    turn_manager: TurnManager,
+    board_size: BoardSize,
+    move_scores: HashMap<u8, isize>,
 }
 
 impl App {
@@ -28,11 +36,18 @@ impl App {
             async_engine_process(ctx_clone, engine_sender, engine_receiver);
         });
 
+        // Other set-up
+        let settings = Settings::new();
+        let turn_manager = TurnManager::new(settings.players);
+
         Self {
             board: Board::new(Id::new("Board"), Pos2 { x: 10.0, y: 10.0 }),
             sender: my_sender,
             receiver: my_receiver,
-            current_player: PieceState::PlayerOne,
+            settings,
+            turn_manager,
+            board_size: Default::default(),
+            move_scores: HashMap::new(),
         }
     }
 }
@@ -43,47 +58,49 @@ impl eframe::App for App {
             // Communicating with the engine
             if let Ok(message) = self.receiver.try_recv() {
                 match message {
-                    EngineMessage::MoveMade {
+                    EngineMessage::MoveReceipt {
                         game_state,
                         move_scores,
                         board_size,
-                    } => match game_state {
-                        GameOver::NoWin => {
-                            self.board.unlock();
-                            self.current_player = self.current_player.reverse();
-                            println!(
-                                "Move Made - depth: {}, size: {}, memory: {}",
-                                board_size.depth, board_size.size, board_size.memory
-                            );
-                        }
-                        GameOver::Tie => {
-                            println!("Tie!");
-                            self.board.lock();
-                        }
-                        GameOver::OneWins => {
-                            println!("One Wins!");
-                            self.board.lock();
-                        }
-                        GameOver::TwoWins => {
-                            println!("Two Wins!");
-                            self.board.lock();
-                        }
-                    },
+                    } => {
+                        self.board_size = board_size;
+                        self.move_scores = move_scores;
+
+                        self.turn_manager.move_receipt(
+                            game_state,
+                            ctx,
+                            &mut self.board,
+                            &self.settings,
+                            &self.sender,
+                        );
+                    }
                     EngineMessage::InvalidMove(error) => panic!("{}", error),
                     EngineMessage::Update {
                         move_scores,
                         board_size,
-                    } => println!(
-                        "depth: {}, size: {}, memory: {}",
-                        board_size.depth, board_size.size, board_size.memory
-                    ),
+                    } => {
+                        self.board_size = board_size;
+                        self.move_scores = move_scores;
+
+                        self.turn_manager
+                            .update_received(&self.move_scores, &self.settings);
+
+                        println!(
+                            "depth: {}, size: {}, memory: {}",
+                            board_size.depth, board_size.size, board_size.memory
+                        );
+                    }
                 }
             }
+
+            self.turn_manager
+                .process_turn(ctx, &mut self.board, &self.settings, &self.sender);
 
             // Generating the UI
             for (column, response) in self.board.render(ctx, ui) {
                 if response.clicked() {
-                    self.board.drop_piece(ctx, column, self.current_player);
+                    self.board
+                        .drop_piece(ctx, column, self.turn_manager.current_player);
                     self.board.lock();
 
                     self.sender

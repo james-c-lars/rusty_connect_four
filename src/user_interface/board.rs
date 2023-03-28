@@ -265,6 +265,7 @@ pub struct Board {
     rect: Rect, // TODO: Possibly just change this to the position of the upper left corner
     /// A piece that floats above the board to show where the user is pointing.
     floater: Piece,
+    // TODO: Consolidate the following fields into some sort of state machine
     /// Whether the floating piece is currently being externally animated.
     animating_floater: bool,
     /// Whether the Board is currently interactable.
@@ -332,6 +333,10 @@ impl Board {
         for column in self.columns.iter() {
             column.render(ui);
         }
+        // Paint floater
+        if self.animating_floater && self.falling_piece.is_none() {
+            self.floater.render_piece(ui.painter());
+        }
 
         if self.locked || self.falling_piece.is_some() {
             // We don't want a locked board to be interactive
@@ -368,7 +373,7 @@ impl Board {
         }
 
         // Paint the floater if the user is interacting with the board
-        if currently_hovering || self.animating_floater {
+        if currently_hovering {
             self.floater.render_piece(ui.painter());
         }
 
@@ -411,14 +416,17 @@ impl Board {
     }
 
     /// Animates the floater over the given column.
-    pub fn float_piece(&mut self, ctx: &Context, column: usize, time: f32) {
+    ///
+    /// Returns whether the animation is finished.
+    pub fn float_piece(&mut self, ctx: &Context, column: usize, time: f32) -> bool {
         self.animating_floater = true;
 
-        self.floater.piece_position.x = ctx.animate_value_with_time(
-            self.id,
-            self.rect.min.x + PIECE_SPACING * (column as f32),
-            time,
-        );
+        let final_position_x = self.rect.min.x + PIECE_SPACING * (column as f32);
+        let current_position_x = ctx.animate_value_with_time(self.id, final_position_x, time);
+
+        self.floater.piece_position.x = current_position_x;
+
+        current_position_x == final_position_x
     }
 
     /// Drops a piece down the given column.
