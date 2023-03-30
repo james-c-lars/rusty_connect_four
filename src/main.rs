@@ -82,8 +82,12 @@ impl eframe::App for App {
                         self.board_size = board_size;
                         self.move_scores = move_scores;
 
-                        self.turn_manager
-                            .update_received(&self.move_scores, &self.settings);
+                        self.turn_manager.update_received(
+                            &self.move_scores,
+                            ctx,
+                            &mut self.board,
+                            &self.settings,
+                        );
 
                         println!(
                             "depth: {}, size: {}, memory: {}",
@@ -119,5 +123,6 @@ fn main() {
         "Connect 4 Engine",
         native_options,
         Box::new(|cc| Box::new(App::new(cc))),
-    );
+    )
+    .unwrap();
 }

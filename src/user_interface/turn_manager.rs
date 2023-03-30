@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// The turn manager devides a computer's turn up into multiple stages.
-/// 
+///
 /// WaitingForMoveReceipt is the default stage of waiting to receive notice that a move has been made.
 /// Delay allows for some delay before the computer makes its move.
 /// WaitingForUpdate is when the turn manager is no longer delaying and now wants to make a move.
@@ -55,7 +55,7 @@ impl TurnManager {
     }
 
     /// Alerts the TurnManager that a move has been made.
-    /// 
+    ///
     /// This method handles transitioning between players's turns.
     pub fn move_receipt(
         &mut self,
@@ -95,21 +95,11 @@ impl TurnManager {
         }
 
         // If the computer is going next, we can start the delay animation
-        board.float_piece(ctx, 0, 0.0);
+        board.animate_floater(ctx, 0, 0.0);
 
-        self.stage = if settings.delay > 0.0 {
-            TurnStage::Delay {
-                start: Instant::now(),
-                animating_to_column: BOARD_WIDTH as usize - 1,
-            }
-        } else {
-            sender
-                .send(UIMessage::RequestUpdate)
-                .expect("Couldn't send RequestUpdate");
-
-            TurnStage::WaitingForUpdate {
-                animating_to_column: BOARD_WIDTH as usize - 1,
-            }
+        self.stage = TurnStage::Delay {
+            start: Instant::now(),
+            animating_to_column: BOARD_WIDTH as usize - 1,
         };
     }
 
@@ -133,11 +123,19 @@ impl TurnManager {
     }
 
     /// Alerts the Turn Manager that the computer has sent an update.
-    pub fn update_received(&mut self, move_scores: &HashMap<u8, isize>, settings: &Settings) {
+    pub fn update_received(
+        &mut self,
+        move_scores: &HashMap<u8, isize>,
+        ctx: &Context,
+        board: &mut Board,
+        settings: &Settings,
+    ) {
         if let TurnStage::WaitingForUpdate {
             animating_to_column: _,
         } = self.stage
         {
+            board.cancel_animation(ctx);
+
             self.stage = TurnStage::AnimateToChosenColumn {
                 chosen_column: choose_computer_move(move_scores, settings),
             };
@@ -178,10 +176,12 @@ impl TurnManager {
                 passively_animate_floater(ctx, board, animating_to_column);
             }
             TurnStage::AnimateToChosenColumn { chosen_column } => {
-                let completed_animation = board.float_piece(ctx, *chosen_column, 0.5);
+                let completed_animation = board.animate_floater(ctx, *chosen_column, 1.0);
 
                 if completed_animation {
+                    board.cancel_animation(ctx);
                     board.drop_piece(ctx, *chosen_column, self.current_player);
+
                     sender
                         .send(UIMessage::MakeMove(*chosen_column))
                         .expect("Couldn't send move to interface");
@@ -199,8 +199,10 @@ impl TurnManager {
 }
 
 /// Animates the floater piece as going left and right.
+///
+/// animating_to_column will be modified as the floater changes which direction it's floating.
 fn passively_animate_floater(ctx: &Context, board: &mut Board, animating_to_column: &mut usize) {
-    let completed_animation = board.float_piece(ctx, *animating_to_column, 1.0);
+    let completed_animation = board.animate_floater(ctx, *animating_to_column, 1.5);
 
     if completed_animation {
         *animating_to_column = BOARD_WIDTH as usize - 1 - *animating_to_column;
@@ -228,7 +230,7 @@ fn choose_computer_move(move_scores: &HashMap<u8, isize>, settings: &Settings) -
 }
 
 /// Picks one of the moves in the sorted_moves Vector.
-/// 
+///
 /// Higher rated moves are more likely to be picked.
 fn easy_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
     let mut weighted_moves = Vec::new();
@@ -242,7 +244,7 @@ fn easy_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
 }
 
 /// Picks one of the moves in the sorted_moves Vector.
-/// 
+///
 /// Higher rated moves are more likely to be picked and losing moves will not be considered.
 fn medium_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
     let backup_move = sorted_moves[0].1;

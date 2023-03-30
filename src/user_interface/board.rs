@@ -406,7 +406,6 @@ impl Board {
     /// Makes the board non-interactable.
     pub fn lock(&mut self) {
         self.locked = true;
-        self.floater.piece_position.x = self.rect.min.x;
     }
 
     /// Makes the board interactable.
@@ -415,10 +414,10 @@ impl Board {
         self.animating_floater = false;
     }
 
-    /// Animates the floater over the given column.
+    /// Animates the floater over to a given column.
     ///
-    /// Returns whether the animation is finished.
-    pub fn float_piece(&mut self, ctx: &Context, column: usize, time: f32) -> bool {
+    /// Returns whether the animation has completed.
+    pub fn animate_floater(&mut self, ctx: &Context, column: usize, time: f32) -> bool {
         self.animating_floater = true;
 
         let final_position_x = self.rect.min.x + PIECE_SPACING * (column as f32);
@@ -427,6 +426,14 @@ impl Board {
         self.floater.piece_position.x = current_position_x;
 
         current_position_x == final_position_x
+    }
+
+    /// Ends the current floater animation.
+    pub fn cancel_animation(&mut self, ctx: &Context) {
+        self.animating_floater = false;
+
+        let current_position_x = self.floater.piece_position.x;
+        ctx.animate_value_with_time(self.id, current_position_x, 0.0);
     }
 
     /// Drops a piece down the given column.
