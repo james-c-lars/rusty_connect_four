@@ -1,4 +1,4 @@
-use egui::{Color32, Context, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, Ui};
+use egui::{Color32, Context, Id, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, Ui, Vec2};
 
 use crate::consts::{BOARD_HEIGHT, BOARD_WIDTH};
 
@@ -468,5 +468,13 @@ impl Board {
         // The floater represents the current player, so this indicates that it's
         // the next player's move
         self.floater.state = player.reverse();
+    }
+
+    /// Returns a vector representing the width and height of a board.
+    pub fn board_size() -> Vec2 {
+        Vec2 {
+            x: PIECE_SPACING * (BOARD_WIDTH as f32),
+            y: PIECE_SPACING * (BOARD_HEIGHT as f32 + 1.0),
+        }
     }
 }

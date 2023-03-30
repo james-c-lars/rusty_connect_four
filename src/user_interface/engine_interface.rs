@@ -7,7 +7,7 @@ use std::{
 use egui::Context;
 
 use crate::game_engine::game_manager::GameManager;
-pub use crate::game_engine::game_manager::{BoardSize, GameOver};
+pub use crate::game_engine::game_manager::{GameOver, TreeSize};
 
 /// Stores what the maximum number of nodes we will allow to be generated
 /// in the engine.
@@ -21,12 +21,12 @@ pub enum EngineMessage {
     MoveReceipt {
         game_state: GameOver,
         move_scores: HashMap<u8, isize>,
-        board_size: BoardSize,
+        tree_size: TreeSize,
     },
     InvalidMove(String),
     Update {
         move_scores: HashMap<u8, isize>,
-        board_size: BoardSize,
+        tree_size: TreeSize,
     },
 }
 
@@ -128,13 +128,13 @@ fn try_make_move(
 ) -> EngineMessage {
     match manager.make_move(column as u8) {
         Ok(()) => {
-            let board_size = manager.size();
-            *nodes_generated = board_size.size;
+            let tree_size = manager.size();
+            *nodes_generated = tree_size.size;
 
             EngineMessage::MoveReceipt {
                 game_state: manager.is_game_over(),
                 move_scores: manager.get_move_scores(),
-                board_size,
+                tree_size,
             }
         }
         Err(error_message) => EngineMessage::InvalidMove(error_message),
@@ -153,7 +153,7 @@ fn send_update(sender: &Sender<EngineMessage>, manager: &GameManager) {
     sender
         .send(EngineMessage::Update {
             move_scores: manager.get_move_scores(),
-            board_size: manager.size(),
+            tree_size: manager.size(),
         })
         .expect(format!("Sending update failed!").as_str());
 }

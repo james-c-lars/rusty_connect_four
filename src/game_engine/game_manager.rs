@@ -3,13 +3,13 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
     game_engine::{
-        board::Board, board_size::calculate_size, board_state::BoardState,
-        layer_generator::LayerGenerator, tree_analysis::how_good_is,
+        board::Board, board_state::BoardState, layer_generator::LayerGenerator,
+        tree_analysis::how_good_is, tree_size::calculate_size,
     },
 };
 
 // Reexport GameOver
-pub use crate::game_engine::{board_size::BoardSize, board_state::GameOver};
+pub use crate::game_engine::{board_state::GameOver, tree_size::TreeSize};
 
 #[derive(Debug)]
 pub struct GameManager {
@@ -146,7 +146,7 @@ impl GameManager {
     }
 
     /// Returns the size and depth of the board.
-    pub fn size(&self) -> BoardSize {
+    pub fn size(&self) -> TreeSize {
         calculate_size(self.board_state.clone())
     }
 }

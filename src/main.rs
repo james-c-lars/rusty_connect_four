@@ -7,7 +7,7 @@ use egui::{Id, Pos2};
 
 use rusty_connect_four::user_interface::{
     board::Board,
-    engine_interface::{async_engine_process, BoardSize, EngineMessage, UIMessage},
+    engine_interface::{async_engine_process, EngineMessage, TreeSize, UIMessage},
     settings::Settings,
     turn_manager::TurnManager,
 };
@@ -19,7 +19,7 @@ pub struct App {
     receiver: Receiver<EngineMessage>,
     settings: Settings,
     turn_manager: TurnManager,
-    board_size: BoardSize,
+    tree_size: TreeSize,
     move_scores: HashMap<u8, isize>,
 }
 
@@ -41,12 +41,12 @@ impl App {
         let turn_manager = TurnManager::new(settings.players);
 
         Self {
-            board: Board::new(Id::new("Board"), Pos2 { x: 10.0, y: 10.0 }),
+            board: Board::new(Id::new("Board"), Pos2 { x: 0.0, y: 0.0 }),
             sender: my_sender,
             receiver: my_receiver,
             settings,
             turn_manager,
-            board_size: Default::default(),
+            tree_size: Default::default(),
             move_scores: HashMap::new(),
         }
     }
@@ -61,9 +61,9 @@ impl eframe::App for App {
                     EngineMessage::MoveReceipt {
                         game_state,
                         move_scores,
-                        board_size,
+                        tree_size,
                     } => {
-                        self.board_size = board_size;
+                        self.tree_size = tree_size;
                         self.move_scores = move_scores;
 
                         self.turn_manager.move_receipt(
@@ -77,9 +77,9 @@ impl eframe::App for App {
                     EngineMessage::InvalidMove(error) => panic!("{}", error),
                     EngineMessage::Update {
                         move_scores,
-                        board_size,
+                        tree_size,
                     } => {
-                        self.board_size = board_size;
+                        self.tree_size = tree_size;
                         self.move_scores = move_scores;
 
                         self.turn_manager.update_received(
@@ -91,7 +91,7 @@ impl eframe::App for App {
 
                         println!(
                             "depth: {}, size: {}, memory: {}",
-                            board_size.depth, board_size.size, board_size.memory
+                            tree_size.depth, tree_size.size, tree_size.memory
                         );
                     }
                 }
@@ -118,7 +118,9 @@ impl eframe::App for App {
 
 /// Runs the application.
 fn main() {
-    let native_options = eframe::NativeOptions::default();
+    let mut native_options = eframe::NativeOptions::default();
+    native_options.initial_window_size = Some(Board::board_size());
+
     eframe::run_native(
         "Connect 4 Engine",
         native_options,
