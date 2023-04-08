@@ -8,6 +8,9 @@ use crate::{
     },
 };
 
+/// Used to optimize alpha-beta pruning by generating moves that are most likely to be good first
+const IDEAL_COLUMNS_FIRST: [u8; 7] = [3, 4, 2, 5, 1, 6, 0];
+
 /// This represents whether the game is over, and if so how
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
@@ -92,14 +95,14 @@ impl BoardState {
 
         // We attempt to generate a new BoardState for each column a piece
         //  can successfully be dropped down
-        for col in 0..BOARD_WIDTH {
-            if Err(FullColumn) == new_board.drop_piece(col, turn) {
+        for col in IDEAL_COLUMNS_FIRST.iter() {
+            if Err(FullColumn) == new_board.drop_piece(*col, turn) {
                 // If the column is full, we proceed to the next
                 continue;
             } else {
                 // We then add a new BoardState corresponding to the move just played
                 self.children
-                    .push(RefCell::new(BoardState::new(new_board, !turn, col)).into());
+                    .push(RefCell::new(BoardState::new(new_board, !turn, *col)).into());
 
                 // We now refresh the board we're using
                 new_board = self.board.clone();
@@ -154,7 +157,7 @@ mod tests {
         consts::BOARD_WIDTH,
         game_engine::{
             board::{Board, OutOfBounds},
-            board_state::{BoardState, GameOver},
+            board_state::{BoardState, GameOver, IDEAL_COLUMNS_FIRST},
         },
     };
 
@@ -172,16 +175,27 @@ mod tests {
         let mut board_state = BoardState::new(board, false, 3);
 
         for (i, child) in board_state.generate_children().iter().enumerate() {
-            assert_eq!(child.borrow().get_last_move() as usize, i);
+            assert_eq!(
+                child.borrow().get_last_move() as usize,
+                IDEAL_COLUMNS_FIRST[i] as usize
+            );
             assert_eq!(child.borrow().is_game_over(), GameOver::NoWin);
             assert_eq!(child.borrow().get_turn(), true);
             assert_eq!(child.borrow().children.len(), 0);
 
-            assert_eq!(child.borrow().board.get_piece(i as u8, 0).unwrap(), false);
+            assert_eq!(
+                child
+                    .borrow()
+                    .board
+                    .get_piece(IDEAL_COLUMNS_FIRST[i], 0)
+                    .unwrap(),
+                false
+            );
         }
 
         assert_eq!(
-            board_state.children[3].borrow().board.get_piece(3, 4),
+            // Here the 0th child is really column 4, due to the alpha-beta move generation optimization
+            board_state.children[0].borrow().board.get_piece(3, 4),
             Ok(false)
         );
 

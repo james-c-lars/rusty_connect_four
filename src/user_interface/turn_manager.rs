@@ -63,7 +63,6 @@ impl TurnManager {
         ctx: &Context,
         board: &mut Board,
         settings: &Settings,
-        sender: &Sender<UIMessage>,
     ) {
         if self.stage != TurnStage::WaitingForMoveReceipt {
             panic!(

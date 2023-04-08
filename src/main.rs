@@ -71,7 +71,6 @@ impl eframe::App for App {
                             ctx,
                             &mut self.board,
                             &self.settings,
-                            &self.sender,
                         );
                     }
                     EngineMessage::InvalidMove(error) => panic!("{}", error),

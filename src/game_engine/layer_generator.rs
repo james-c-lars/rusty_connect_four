@@ -191,7 +191,8 @@ mod tests {
         ]);
 
         assert_eq!(
-            board_state.borrow().children[6].borrow().children[6]
+            // Here the 5th child is really column 7, due to the alpha-beta move generation optimization
+            board_state.borrow().children[5].borrow().children[5]
                 .borrow()
                 .board,
             last_board
