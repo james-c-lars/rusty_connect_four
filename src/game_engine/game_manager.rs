@@ -9,7 +9,9 @@ use crate::{
 };
 
 // Reexport GameOver
-pub use crate::game_engine::{board_state::GameOver, tree_size::TreeSize};
+pub use crate::game_engine::{
+    transposition::TranspositionTable, tree_size::TreeSize, win_check::GameOver,
+};
 
 #[derive(Debug)]
 pub struct GameManager {
@@ -20,11 +22,11 @@ pub struct GameManager {
 impl GameManager {
     /// Starts a new game with an empty board.
     pub fn new_game() -> GameManager {
-        let state: Rc<RefCell<BoardState>> = RefCell::new(BoardState::default_const()).into();
+        let state: Rc<RefCell<BoardState>> = RefCell::new(Default::default()).into();
 
         GameManager {
             board_state: state.clone(),
-            layer_generator: LayerGenerator::new(state),
+            layer_generator: LayerGenerator::new(state, TranspositionTable::default()),
         }
     }
 
@@ -34,18 +36,13 @@ impl GameManager {
     pub fn start_from_position(
         position: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
         turn: bool,
-        last_move: u8,
     ) -> GameManager {
-        let state: Rc<RefCell<BoardState>> = RefCell::new(BoardState::new(
-            Board::from_arrays(position),
-            turn,
-            last_move,
-        ))
-        .into();
+        let state: Rc<RefCell<BoardState>> =
+            RefCell::new(BoardState::new(Board::from_arrays(position), turn)).into();
 
         GameManager {
             board_state: state.clone(),
-            layer_generator: LayerGenerator::new(state),
+            layer_generator: LayerGenerator::new(state, TranspositionTable::default()),
         }
     }
 
@@ -93,7 +90,7 @@ impl GameManager {
 
         let mut is_valid_col = false;
         for child in self.board_state.borrow().children.iter() {
-            if child.borrow().get_last_move() == col {
+            if child.get_last_move() == col {
                 is_valid_col = true;
             }
         }
@@ -107,7 +104,7 @@ impl GameManager {
 
         self.board_state
             .replace(self.board_state.take().narrow_possibilities(col).take());
-        self.layer_generator = LayerGenerator::new(self.board_state.clone());
+        self.layer_generator.restart(self.board_state.clone());
         Ok(())
     }
 
@@ -124,17 +121,17 @@ impl GameManager {
 
         for child in child_iter {
             let child_score = if whose_turn {
-                how_good_is(&child.borrow())
+                how_good_is(&child.state.borrow())
             } else {
                 // Some funky handling to avoid int overflow on negating isize::MIN
-                match how_good_is(&child.borrow()) {
+                match how_good_is(&child.state.borrow()) {
                     isize::MIN => isize::MAX,
                     isize::MAX => isize::MIN,
                     score => -score,
                 }
             };
 
-            move_scores.insert(child.borrow().get_last_move(), child_score);
+            move_scores.insert(child.get_last_move(), child_score);
         }
 
         move_scores
@@ -147,7 +144,7 @@ impl GameManager {
 
     /// Returns the size and depth of the board.
     pub fn size(&self) -> TreeSize {
-        calculate_size(self.board_state.clone())
+        calculate_size(self.board_state.clone(), self.layer_generator.table_ref())
     }
 }
 
@@ -156,7 +153,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::game_engine::{
-        board_state::GameOver, game_manager::GameManager, tree_analysis::how_good_is,
+        game_manager::GameManager, tree_analysis::how_good_is, win_check::GameOver,
     };
 
     #[test]
@@ -170,7 +167,7 @@ mod tests {
             [0, 1, 2, 0, 2, 1, 2],
         ];
 
-        let manager = GameManager::start_from_position(board_array, true, 6);
+        let manager = GameManager::start_from_position(board_array, true);
 
         assert_eq!(manager.get_position(), board_array);
     }
@@ -186,7 +183,7 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ];
 
-        let mut manager = GameManager::start_from_position(board_array, false, 0);
+        let mut manager = GameManager::start_from_position(board_array, false);
 
         manager.try_generate_x_states(10000);
 
@@ -194,7 +191,7 @@ mod tests {
 
         assert_eq!(how_good_is(&state.borrow()), isize::MIN);
 
-        let mut manager = GameManager::start_from_position(board_array, true, 0);
+        let mut manager = GameManager::start_from_position(board_array, true);
 
         manager.try_generate_x_states(10000);
 
@@ -214,7 +211,7 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ];
 
-        let mut manager = GameManager::start_from_position(board_array, false, 0);
+        let mut manager = GameManager::start_from_position(board_array, false);
 
         manager.make_move(5).unwrap();
         manager.make_move(5).unwrap_err();
@@ -229,7 +226,7 @@ mod tests {
         manager.make_move(6).unwrap_err();
         assert_eq!(manager.is_game_over(), GameOver::OneWins);
 
-        let mut manager = GameManager::start_from_position(board_array, true, 0);
+        let mut manager = GameManager::start_from_position(board_array, true);
 
         manager.make_move(5).unwrap();
         manager.make_move(5).unwrap_err();
@@ -256,7 +253,7 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ];
 
-        let mut manager = GameManager::start_from_position(board_array, false, 0);
+        let mut manager = GameManager::start_from_position(board_array, false);
         manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
@@ -265,7 +262,7 @@ mod tests {
         real_move_scores.insert(6, 0);
         assert_eq!(move_scores, real_move_scores);
 
-        let mut manager = GameManager::start_from_position(board_array, true, 0);
+        let mut manager = GameManager::start_from_position(board_array, true);
         manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
@@ -283,7 +280,7 @@ mod tests {
             [0, 0, 0, 1, 0, 0, 0],
         ];
 
-        let mut manager = GameManager::start_from_position(board_array, false, 0);
+        let mut manager = GameManager::start_from_position(board_array, false);
         manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();
@@ -295,7 +292,7 @@ mod tests {
             }
         }
 
-        let mut manager = GameManager::start_from_position(board_array, true, 0);
+        let mut manager = GameManager::start_from_position(board_array, true);
         manager.try_generate_x_states(10000);
 
         let move_scores = manager.get_move_scores();

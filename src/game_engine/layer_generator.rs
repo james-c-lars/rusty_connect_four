@@ -1,6 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::game_engine::board_state::{BoardState, GameOver};
+use crate::game_engine::{
+    board_state::BoardState, transposition::TranspositionTable, win_check::GameOver,
+};
 
 /// Iterator used to generate a BoardState decision tree. Each iteration will
 /// return how many new board states were generated.
@@ -8,9 +10,11 @@ use crate::game_engine::board_state::{BoardState, GameOver};
 /// Iteration will stop when the decision tree is complete.
 #[derive(Debug)]
 pub struct LayerGenerator {
+    // TODO: Could these be HashSets? Prevent duplicate calls to generate_children
     generation_1: Vec<Rc<RefCell<BoardState>>>,
     generation_2: Vec<Rc<RefCell<BoardState>>>,
     generation_1_is_new: bool,
+    table: TranspositionTable,
 }
 
 impl LayerGenerator {
@@ -36,15 +40,30 @@ impl LayerGenerator {
         }
     }
 
+    /// Returns a reference to the TranspositionTable used to generate BoardStates.
+    pub fn table_ref(&self) -> &TranspositionTable {
+        &self.table
+    }
+
     /// Constructs a new LayerGenerator for a given BoardState.
-    pub fn new(board: Rc<RefCell<BoardState>>) -> LayerGenerator {
+    pub fn new(board: Rc<RefCell<BoardState>>, table: TranspositionTable) -> LayerGenerator {
         let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
 
         LayerGenerator {
             generation_1: previous_generation,
             generation_2: new_generation,
             generation_1_is_new: false,
+            table,
         }
+    }
+
+    /// Restarts the LayerGeneration process, using a new root for the decision tree.
+    pub fn restart(&mut self, board: Rc<RefCell<BoardState>>) {
+        let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
+
+        self.generation_1 = previous_generation;
+        self.generation_2 = new_generation;
+        self.generation_1_is_new = false;
     }
 
     /// Finds the BoardStates at the bottom of the decision tree and returns
@@ -70,7 +89,7 @@ impl LayerGenerator {
             // If the node already has had its children generated
             if curr_state.borrow().children.len() > 0 {
                 // Add the children to the stack to be explored
-                to_explore.extend(curr_state.borrow().children.clone());
+                to_explore.extend(curr_state.borrow().children.iter().map(|c| c.state.clone()));
             } else if curr_state.borrow().is_game_over() == GameOver::NoWin {
                 // Otherwise, if the node isn't a dead end (already won)
                 // Add the node to our list of nodes that need children generated
@@ -116,7 +135,7 @@ impl Iterator for LayerGenerator {
         // If there are still BoardStates in the previous generation, we can
         //  continue computing from there
         if let Some(board_state) = self.get_previous_generation().pop() {
-            let generated_children = board_state.borrow_mut().generate_children();
+            let generated_children = board_state.borrow_mut().generate_children(&mut self.table);
             let num_generated = generated_children.len();
 
             self.get_new_generation().extend(generated_children);
@@ -148,7 +167,10 @@ mod tests {
 
     use crate::{
         consts::BOARD_WIDTH,
-        game_engine::{board::Board, board_state::BoardState, layer_generator::LayerGenerator},
+        game_engine::{
+            board::Board, board_state::BoardState, layer_generator::LayerGenerator,
+            transposition::TranspositionTable,
+        },
     };
 
     #[test]
@@ -160,6 +182,7 @@ mod tests {
             generation_1: first_generation,
             generation_2: Vec::new(),
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
 
         assert!(layer_generator.next().is_some());
@@ -192,19 +215,20 @@ mod tests {
 
         assert_eq!(
             // Here the 5th child is really column 7, due to the alpha-beta move generation optimization
-            board_state.borrow().children[5].borrow().children[5]
+            board_state.borrow().children[5].state.borrow().children[5]
+                .state
                 .borrow()
                 .board,
             last_board
         );
 
-        let board_state = RefCell::new(BoardState::default());
-        let first_generation = vec![board_state.into()];
-
+        let board_state = Rc::new(RefCell::new(BoardState::default()));
+        let first_generation = vec![board_state];
         let mut layer_generator = LayerGenerator {
             generation_1: first_generation,
             generation_2: Vec::new(),
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
 
         for _ in 0..10_000 {
@@ -217,7 +241,6 @@ mod tests {
     #[test]
     fn get_bottom_two_layers() {
         let board_state = Rc::new(RefCell::new(BoardState::default()));
-
         let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
 
         assert_eq!(previous.len(), 1);
@@ -227,6 +250,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
         layer_generator.next();
 
@@ -245,6 +269,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
         for _ in 0..7 {
             layer_generator.next();
@@ -265,6 +290,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
 
         const SOME_NUMBER: u8 = 4;
@@ -295,6 +321,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
         for _ in 0..SOME_NUMBER {
             layer_generator.next();
@@ -318,6 +345,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
+            table: TranspositionTable::default(),
         };
         for _ in 0..100_000 {
             layer_generator.next();
@@ -349,9 +377,9 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
-        let root = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+        let root = Rc::new(RefCell::new(BoardState::new(board, true)));
 
-        let mut generator = LayerGenerator::new(root);
+        let mut generator = LayerGenerator::new(root, TranspositionTable::default());
 
         assert_eq!(generator.next(), Some(1));
 
@@ -364,9 +392,9 @@ mod tests {
             [0, 0, 0, 0, 0, 0, 1],
         ]);
 
-        let root = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
+        let root = Rc::new(RefCell::new(BoardState::new(board, true)));
 
-        let mut generator = LayerGenerator::new(root);
+        let mut generator = LayerGenerator::new(root, TranspositionTable::default());
 
         for _ in 0..(7 + 49 + 343) {
             assert_eq!(generator.next(), Some(6));

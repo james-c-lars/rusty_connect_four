@@ -70,6 +70,33 @@ impl Board {
         return true;
     }
 
+    /// Gets an iterator over the board's contents. Used for hashing the board.
+    pub fn iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.column_heights
+            .iter()
+            .chain(self.column_bitmaps.iter())
+            .map(|i| *i)
+    }
+
+    /// Gets an iterator over the board's content reversed symetrically. Used for hashing the board.
+    pub fn flipped_iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.column_heights
+            .iter()
+            .rev()
+            .chain(self.column_bitmaps.iter().rev())
+            .map(|i| *i)
+    }
+
+    /// Flips this Board horizontally.
+    pub fn flip(&mut self) {
+        for (i, val) in self.column_heights.into_iter().rev().enumerate() {
+            self.column_heights[i] = val;
+        }
+        for (i, val) in self.column_bitmaps.into_iter().rev().enumerate() {
+            self.column_bitmaps[i] = val;
+        }
+    }
+
     /// Used to initialize a board based on a 2d array.
     ///
     /// If the board contains floating pieces, it will have unexpected results.
@@ -270,5 +297,29 @@ mod tests {
         ]);
 
         assert_eq!(board.get_max_height(), 6);
+    }
+
+    #[test]
+    fn board_flip() {
+        let board = Board::from_arrays([
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 1, 0, 0, 1],
+            [0, 2, 0, 1, 0, 2, 1],
+            [0, 1, 2, 1, 0, 1, 2],
+            [0, 1, 2, 1, 2, 1, 2],
+        ]);
+
+        let mut flipped_board = Board::from_arrays([
+            [2, 0, 0, 0, 0, 0, 0],
+            [2, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 1, 0, 0, 0],
+            [1, 2, 0, 1, 0, 2, 0],
+            [2, 1, 0, 1, 2, 1, 0],
+            [2, 1, 2, 1, 2, 1, 0],
+        ]);
+        flipped_board.flip();
+
+        assert_eq!(board, flipped_board);
     }
 }

@@ -3,8 +3,45 @@ use crate::{
     game_engine::board::{Board, OutOfBounds},
 };
 
+/// This represents whether the game is over, and if so how
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Default, Copy, Clone)]
+pub enum GameOver {
+    #[default]
+    NoWin,
+    Tie,
+    OneWins,
+    TwoWins,
+}
+
+impl From<u8> for GameOver {
+    fn from(num: u8) -> Self {
+        match num {
+            0 => Self::NoWin,
+            1 => Self::Tie,
+            2 => Self::OneWins,
+            3 => Self::TwoWins,
+            _ => panic!("Tried to convert a number greater than 3 to a GameOver enum"),
+        }
+    }
+}
+
+/// Gets whether the game is over for a given Board.
+pub fn is_game_over(board: &Board, turn: bool) -> GameOver {
+    if has_color_won(&board, !turn) {
+        match !turn {
+            false => GameOver::OneWins,
+            true => GameOver::TwoWins,
+        }
+    } else if board.is_full() {
+        GameOver::Tie
+    } else {
+        GameOver::NoWin
+    }
+}
+
 /// Returns whether the given color has won in the given board state.
-pub fn has_color_won(board: &Board, color: bool) -> bool {
+fn has_color_won(board: &Board, color: bool) -> bool {
     // Figuring out what row the highest piece is in
     // Can prevent iterating through empty rows
     let highest_row = board.get_max_height();

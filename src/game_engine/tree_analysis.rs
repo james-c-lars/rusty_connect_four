@@ -4,8 +4,7 @@ use std::{
 };
 
 use crate::game_engine::{
-    board_state::{BoardState, GameOver},
-    heuristics::how_good_is_board,
+    board_state::BoardState, heuristics::how_good_is_board, win_check::GameOver,
 };
 
 /// Analyses a BoardState to determine how good it is based off of its
@@ -36,7 +35,7 @@ impl BoardState {
             // We are the maximizing player
             let mut value = MIN;
             for child in self.children.iter() {
-                value = max(value, child.borrow().alpha_beta_pruning(alpha, beta));
+                value = max(value, child.state.borrow().alpha_beta_pruning(alpha, beta));
 
                 if value >= beta {
                     break;
@@ -50,7 +49,7 @@ impl BoardState {
             // We are the minimizing player
             let mut value = MAX;
             for child in self.children.iter() {
-                value = min(value, child.borrow().alpha_beta_pruning(alpha, beta));
+                value = min(value, child.state.borrow().alpha_beta_pruning(alpha, beta));
 
                 if value <= alpha {
                     break;
@@ -74,6 +73,7 @@ mod tests {
 
     use crate::game_engine::{
         board::Board, board_state::BoardState, layer_generator::LayerGenerator,
+        transposition::TranspositionTable,
     };
 
     use super::how_good_is;
@@ -89,8 +89,8 @@ mod tests {
             [0, 1, 1, 1, 0, 0, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, false, 0)));
-        let mut generator = LayerGenerator::new(board_state.clone());
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, false)));
+        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
 
         for _ in 0..1000 {
             generator.next();
@@ -107,8 +107,8 @@ mod tests {
             [0, 1, 1, 0, 2, 2, 1],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
-        let mut generator = LayerGenerator::new(board_state.clone());
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, true)));
+        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
 
         for _ in 0..1000 {
             generator.next();
@@ -126,8 +126,8 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, false, 0)));
-        let mut generator = LayerGenerator::new(board_state.clone());
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, false)));
+        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
 
         for _ in 0..1000 {
             generator.next();
@@ -144,8 +144,8 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, true, 0)));
-        let mut generator = LayerGenerator::new(board_state.clone());
+        let board_state = Rc::new(RefCell::new(BoardState::new(board, true)));
+        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
 
         for _ in 0..1000 {
             generator.next();

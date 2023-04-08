@@ -4,32 +4,35 @@ use crate::{
     consts::BOARD_WIDTH,
     game_engine::{
         board::{Board, FullColumn},
-        win_check::has_color_won,
+        transposition::{IsFlipped, TranspositionTable},
+        win_check::{is_game_over, GameOver},
     },
 };
 
 /// Used to optimize alpha-beta pruning by generating moves that are most likely to be good first
 const IDEAL_COLUMNS_FIRST: [u8; 7] = [3, 4, 2, 5, 1, 6, 0];
 
-/// This represents whether the game is over, and if so how
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum GameOver {
-    NoWin,
-    Tie,
-    OneWins,
-    TwoWins,
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
+pub struct ChildState {
+    pub state: Rc<RefCell<BoardState>>,
+    last_move: u8,
+    is_flipped: IsFlipped,
 }
 
-impl From<u8> for GameOver {
-    fn from(num: u8) -> Self {
-        match num {
-            0 => Self::NoWin,
-            1 => Self::Tie,
-            2 => Self::OneWins,
-            3 => Self::TwoWins,
-            _ => panic!("Tried to convert a number greater than 3 to a GameOver enum"),
-        }
+impl ChildState {
+    /// Gets the move that was played to reach this child.
+    pub fn get_last_move(&self) -> u8 {
+        self.last_move
+    }
+
+    /// Corrects this child's last move and flipped state based on the fact that its parent has
+    /// flipped its orientation.
+    ///
+    /// Should only be used when the parent of this ChildState is the root of the decision tree and
+    /// has just flipped its orientation.
+    pub fn parent_flipped(&mut self) {
+        self.last_move = 6 - self.last_move;
+        self.is_flipped = self.is_flipped.flip();
     }
 }
 
@@ -40,54 +43,41 @@ impl From<u8> for GameOver {
 ///  is the game over, who has won, whose turn is it, etc.
 /// It also has a number of possible BoardStates which could result from
 ///  this one, its children.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct BoardState {
     pub board: Board,
-    pub children: Vec<Rc<RefCell<BoardState>>>,
-    last_move: u8,
-    metadata: u8,
+    pub children: Vec<ChildState>,
+    turn: bool,
+    game_over: GameOver,
 }
 
 impl BoardState {
     /// Constructs a new BoardState.
-    pub fn new(board: Board, turn: bool, last_move: u8) -> BoardState {
-        let game_over = if has_color_won(&board, !turn) {
-            match !turn {
-                false => GameOver::OneWins,
-                true => GameOver::TwoWins,
-            }
-        } else if board.is_full() {
-            GameOver::Tie
-        } else {
-            GameOver::NoWin
-        };
-
-        let metadata = (turn as u8) + ((game_over as u8) << 4);
+    pub fn new(board: Board, turn: bool) -> BoardState {
+        let game_over = is_game_over(&board, turn);
 
         BoardState {
             board,
             children: Vec::new(),
-            last_move,
-            metadata,
-        }
-    }
-
-    /// Constructs a board state of an empty board.
-    pub const fn default_const() -> BoardState {
-        BoardState {
-            board: Board::default_const(),
-            children: Vec::new(),
-            last_move: 0,
-            metadata: 0,
+            turn,
+            game_over,
         }
     }
 
     /// Populates the children vector with new BoardStates.
-    pub fn generate_children(&mut self) -> Vec<Rc<RefCell<BoardState>>> {
+    pub fn generate_children(
+        &mut self,
+        table: &mut TranspositionTable,
+    ) -> Vec<Rc<RefCell<BoardState>>> {
         // If this BoardState has an already won game, no children are generated
         match self.is_game_over() {
             GameOver::NoWin => (),
-            _ => return self.children.clone(),
+            _ => return self.children.iter().map(|c| c.state.clone()).collect(),
+        }
+
+        // Children can be already generated if a different transposition calulated them
+        if self.children.len() > 0 {
+            return Vec::new();
         }
 
         let turn = self.get_turn();
@@ -101,15 +91,19 @@ impl BoardState {
                 continue;
             } else {
                 // We then add a new BoardState corresponding to the move just played
-                self.children
-                    .push(RefCell::new(BoardState::new(new_board, !turn, *col)).into());
+                let (child_state, is_flipped) = table.get_board_state(new_board, !turn);
+                self.children.push(ChildState {
+                    state: child_state,
+                    last_move: *col,
+                    is_flipped,
+                });
 
                 // We now refresh the board we're using
                 new_board = self.board.clone();
             }
         }
 
-        self.children.clone()
+        self.children.iter().map(|c| c.state.clone()).collect()
     }
 
     /// Used to return the child BoardState corresponding to a particular move.
@@ -117,8 +111,17 @@ impl BoardState {
     /// Fails if the column chosen isn't an option, because it's full.
     pub fn narrow_possibilities(self, col: u8) -> Rc<RefCell<BoardState>> {
         for child in self.children {
-            if child.borrow().get_last_move() == col {
-                return child;
+            if child.get_last_move() == col {
+                if child.is_flipped == IsFlipped::Flipped {
+                    // If the child is flipped, we need to unflip it and adjust the tree
+                    child.state.borrow_mut().board.flip();
+
+                    for grandchild in child.state.borrow_mut().children.iter_mut() {
+                        grandchild.parent_flipped();
+                    }
+                }
+
+                return child.state;
             }
         }
 
@@ -130,17 +133,12 @@ impl BoardState {
 
     /// Returns whose turn it is.
     pub fn get_turn(&self) -> bool {
-        self.metadata % 2 == 1
+        self.turn
     }
 
     /// Returns if the game is over and who won if it is.
     pub fn is_game_over(&self) -> GameOver {
-        GameOver::from(self.metadata >> 4)
-    }
-
-    /// Returns what column the last piece was dropped in.
-    pub fn get_last_move(&self) -> u8 {
-        self.last_move
+        self.game_over
     }
 
     /// Returns how many moves into the game this board state is
@@ -158,6 +156,7 @@ mod tests {
         game_engine::{
             board::{Board, OutOfBounds},
             board_state::{BoardState, GameOver, IDEAL_COLUMNS_FIRST},
+            transposition::TranspositionTable,
         },
     };
 
@@ -172,30 +171,25 @@ mod tests {
             [0, 0, 0, 1, 0, 0, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, false, 3);
+        let mut board_state = BoardState::new(board, false);
+        let mut table = TranspositionTable::default();
+        board_state.generate_children(&mut table);
 
-        for (i, child) in board_state.generate_children().iter().enumerate() {
+        for (i, child) in board_state.children.iter().enumerate() {
             assert_eq!(
-                child.borrow().get_last_move() as usize,
+                child.get_last_move() as usize,
                 IDEAL_COLUMNS_FIRST[i] as usize
             );
-            assert_eq!(child.borrow().is_game_over(), GameOver::NoWin);
-            assert_eq!(child.borrow().get_turn(), true);
-            assert_eq!(child.borrow().children.len(), 0);
+            assert_eq!(child.state.borrow().is_game_over(), GameOver::NoWin);
+            assert_eq!(child.state.borrow().get_turn(), true);
+            assert_eq!(child.state.borrow().children.len(), 0);
 
-            assert_eq!(
-                child
-                    .borrow()
-                    .board
-                    .get_piece(IDEAL_COLUMNS_FIRST[i], 0)
-                    .unwrap(),
-                false
-            );
+            assert_eq!(child.state.borrow().board.get_piece(3, 0).unwrap(), false);
         }
 
         assert_eq!(
             // Here the 0th child is really column 4, due to the alpha-beta move generation optimization
-            board_state.children[0].borrow().board.get_piece(3, 4),
+            board_state.children[0].state.borrow().board.get_piece(3, 4),
             Ok(false)
         );
 
@@ -208,19 +202,22 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 3);
+        let mut board_state = BoardState::new(board, true);
+        let mut table = TranspositionTable::default();
+        board_state.generate_children(&mut table);
 
-        for child in board_state.generate_children().iter() {
-            assert_eq!(child.borrow().get_last_move() as usize, 1);
-            assert_eq!(child.borrow().is_game_over(), GameOver::Tie);
-            assert_eq!(child.borrow().get_turn(), false);
-            assert_eq!(child.borrow().children.len(), 0);
+        for child in board_state.children.iter() {
+            assert_eq!(child.get_last_move() as usize, 1);
+            assert_eq!(child.state.borrow().is_game_over(), GameOver::Tie);
+            assert_eq!(child.state.borrow().get_turn(), false);
+            assert_eq!(child.state.borrow().children.len(), 0);
 
             assert_eq!(
                 child
+                    .state
                     .borrow()
                     .board
-                    .get_piece(child.borrow().get_last_move(), 5)
+                    .get_piece(child.get_last_move(), 5)
                     .unwrap(),
                 true
             );
@@ -235,19 +232,22 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
-        let mut board_state = BoardState::new(board, false, 3);
+        let mut board_state = BoardState::new(board, false);
+        let mut table = TranspositionTable::default();
+        board_state.generate_children(&mut table);
 
-        for child in board_state.generate_children().iter() {
-            assert_eq!(child.borrow().get_last_move() as usize, 1);
-            assert_eq!(child.borrow().is_game_over(), GameOver::OneWins);
-            assert_eq!(child.borrow().get_turn(), true);
-            assert_eq!(child.borrow().children.len(), 0);
+        for child in board_state.children.iter() {
+            assert_eq!(child.get_last_move() as usize, 1);
+            assert_eq!(child.state.borrow().is_game_over(), GameOver::OneWins);
+            assert_eq!(child.state.borrow().get_turn(), true);
+            assert_eq!(child.state.borrow().children.len(), 0);
 
             assert_eq!(
                 child
+                    .state
                     .borrow()
                     .board
-                    .get_piece(child.borrow().get_last_move(), 5)
+                    .get_piece(child.get_last_move(), 5)
                     .unwrap(),
                 false
             );
@@ -264,25 +264,28 @@ mod tests {
             [1, 1, 1, 0, 0, 2, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 3);
+        let mut board_state = BoardState::new(board, true);
+        let mut table = TranspositionTable::default();
+        board_state.generate_children(&mut table);
 
-        for child in board_state.generate_children().iter() {
-            assert_eq!(child.borrow().is_game_over(), GameOver::NoWin);
-            assert_eq!(child.borrow().get_turn(), false);
-            assert_eq!(child.borrow().children.len(), 0);
+        for child in board_state.children.iter() {
+            assert_eq!(child.state.borrow().is_game_over(), GameOver::NoWin);
+            assert_eq!(child.state.borrow().get_turn(), false);
+            assert_eq!(child.state.borrow().children.len(), 0);
 
-            let col = child.borrow().get_last_move();
+            let col = child.get_last_move();
             assert_eq!(
                 child
+                    .state
                     .borrow()
                     .board
-                    .get_piece(col, child.borrow().board.get_height(col) - 1)
+                    .get_piece(col, child.state.borrow().board.get_height(col) - 1)
                     .unwrap(),
                 true
             );
 
             if col != 0 {
-                assert_eq!(child.borrow().board.get_piece(0, 3), Err(OutOfBounds));
+                assert_eq!(child.state.borrow().board.get_piece(0, 3), Err(OutOfBounds));
             }
         }
 
@@ -297,9 +300,10 @@ mod tests {
             [1, 1, 1, 1, 0, 0, 0],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 3);
+        let mut board_state = BoardState::new(board, true);
+        let mut table = TranspositionTable::default();
 
-        for _ in board_state.generate_children().iter() {
+        for _ in board_state.generate_children(&mut table).iter() {
             panic!("A winning game should never generate children!");
         }
 
@@ -319,9 +323,12 @@ mod tests {
 
         for i in 0..BOARD_WIDTH {
             let mut board_state: Rc<RefCell<BoardState>> =
-                RefCell::new(BoardState::new(board.clone(), false, 3)).into();
-            for child in board_state.borrow_mut().generate_children() {
-                child.borrow_mut().generate_children();
+                RefCell::new(BoardState::new(board.clone(), false)).into();
+            let mut table = TranspositionTable::default();
+            board_state.borrow_mut().generate_children(&mut table);
+
+            for child in board_state.borrow().children.iter() {
+                child.state.borrow_mut().generate_children(&mut table);
             }
 
             let mut board_clone = board.clone();
@@ -348,15 +355,16 @@ mod tests {
             [0, 2, 1, 1, 2, 0, 1],
         ]);
 
-        let mut board_state = BoardState::new(board, true, 0);
-        board_state.generate_children();
+        let mut board_state = BoardState::new(board, true);
+        let mut table = TranspositionTable::default();
+        board_state.generate_children(&mut table);
 
         board_state.narrow_possibilities(6);
     }
 
     #[test]
     fn get_depth() {
-        let mut board_state = BoardState::new(Board::default(), false, 0);
+        let mut board_state = BoardState::new(Board::default(), false);
 
         for i in 0..21 {
             assert_eq!(i, board_state.get_depth());
