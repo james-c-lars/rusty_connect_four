@@ -40,6 +40,11 @@ impl LayerGenerator {
         }
     }
 
+    /// Gets the sizes of the internal buffers.
+    pub fn buffer_size(&self) -> usize {
+        self.generation_1.len() + self.generation_2.len()
+    }
+
     /// Returns a reference to the TranspositionTable used to generate BoardStates.
     pub fn table_ref(&self) -> &TranspositionTable {
         &self.table
@@ -64,6 +69,11 @@ impl LayerGenerator {
         self.generation_1 = previous_generation;
         self.generation_2 = new_generation;
         self.generation_1_is_new = false;
+    }
+
+    /// Cleans unreachable nodes from the transposition table.
+    pub fn clean_transposition_table(&mut self) {
+        self.table.clean();
     }
 
     /// Finds the BoardStates at the bottom of the decision tree and returns
@@ -192,7 +202,6 @@ mod tests {
         );
         assert_eq!(layer_generator.get_previous_generation().len(), 0);
 
-        
         for _ in 0..BOARD_WIDTH {
             assert!(layer_generator.next().is_some());
         }
@@ -200,11 +209,7 @@ mod tests {
             layer_generator.get_new_generation().len(),
             (BOARD_WIDTH * 4) as usize
         );
-        assert_eq!(
-            layer_generator.get_previous_generation().len(),
-            0
-        );
-
+        assert_eq!(layer_generator.get_previous_generation().len(), 0);
 
         let last_board = Board::from_arrays([
             [0, 0, 0, 0, 0, 0, 0],

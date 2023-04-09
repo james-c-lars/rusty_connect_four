@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 
 use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
@@ -6,6 +6,7 @@ use crate::{
         board::Board, board_state::BoardState, layer_generator::LayerGenerator,
         tree_analysis::how_good_is, tree_size::calculate_size,
     },
+    log::{log_message, LogType},
 };
 
 // Reexport GameOver
@@ -56,6 +57,7 @@ impl GameManager {
     ///
     /// Returns the number of board states generated.
     pub fn try_generate_x_states(&mut self, x: usize) -> usize {
+        let start = Instant::now();
         let mut num_generated = 0;
 
         while num_generated < x {
@@ -66,11 +68,18 @@ impl GameManager {
             }
         }
 
+        log_message(
+            LogType::Performance,
+            format!("Generate {} states - {}", x, start.elapsed().as_secs()),
+        );
+
         num_generated
     }
 
     /// Drop a piece down the corresponding column.
     pub fn make_move(&mut self, col: u8) -> Result<(), String> {
+        let start = Instant::now();
+
         // If the game is already won, no move is valid
         if GameOver::NoWin != self.board_state.borrow().is_game_over() {
             return Err(format!("Game is already over. Can't make move: {}", col));
@@ -102,9 +111,33 @@ impl GameManager {
             ));
         }
 
+        let sub_start = Instant::now();
         self.board_state
             .replace(self.board_state.take().narrow_possibilities(col).take());
+        log_message(
+            LogType::Performance,
+            format!("Make Move [Trim Tree] - {}", sub_start.elapsed().as_secs()),
+        );
+
+        let sub_start = Instant::now();
         self.layer_generator.restart(self.board_state.clone());
+        log_message(
+            LogType::Performance,
+            format!("Make Move [Restart Layer Generator] - {}", sub_start.elapsed().as_secs()),
+        );
+
+        let sub_start = Instant::now();
+        self.layer_generator.clean_transposition_table();
+        log_message(
+            LogType::Performance,
+            format!("Make Move [Clean Transposition Table] - {}", sub_start.elapsed().as_secs()),
+        );
+
+        log_message(
+            LogType::Performance,
+            format!("Make Move - {}", start.elapsed().as_secs()),
+        );
+
         Ok(())
     }
 
@@ -113,6 +146,8 @@ impl GameManager {
     /// Higher scores are better for the player about to make a move,
     ///  lower scores are better for their opponent.
     pub fn get_move_scores(&self) -> HashMap<u8, isize> {
+        let start = Instant::now();
+
         let mut move_scores = HashMap::new();
 
         let borrowed_board_state = self.board_state.borrow();
@@ -134,6 +169,11 @@ impl GameManager {
             move_scores.insert(child.get_last_move(), child_score);
         }
 
+        log_message(
+            LogType::Performance,
+            format!("Get Move Scores - {}", start.elapsed().as_secs()),
+        );
+
         move_scores
     }
 
@@ -144,7 +184,28 @@ impl GameManager {
 
     /// Returns the size and depth of the board.
     pub fn size(&self) -> TreeSize {
-        calculate_size(self.board_state.clone(), self.layer_generator.table_ref())
+        let start = Instant::now();
+
+        let to_return = calculate_size(self.board_state.clone(), &self.layer_generator);
+
+        log_message(
+            LogType::Performance,
+            format!("Size - {}", start.elapsed().as_secs()),
+        );
+
+        to_return
+    }
+
+    /// Cleans unreachable nodes from the transposition table.
+    pub fn clean_transposition_table(&mut self) {
+        let start = Instant::now();
+
+        self.layer_generator.clean_transposition_table();
+
+        log_message(
+            LogType::Performance,
+            format!("Clean Transposition Table - {}", start.elapsed().as_secs()),
+        );
     }
 }
 

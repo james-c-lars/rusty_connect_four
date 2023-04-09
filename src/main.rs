@@ -5,11 +5,14 @@ use std::{
 
 use egui::{Id, Pos2};
 
-use rusty_connect_four::user_interface::{
-    board::Board,
-    engine_interface::{async_engine_process, EngineMessage, TreeSize, UIMessage},
-    settings::Settings,
-    turn_manager::TurnManager,
+use rusty_connect_four::{
+    log::{log_message, LogType},
+    user_interface::{
+        board::Board,
+        engine_interface::{async_engine_process, EngineMessage, TreeSize, UIMessage},
+        settings::Settings,
+        turn_manager::TurnManager,
+    },
 };
 
 /// Stores the current state of the application.
@@ -57,6 +60,11 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Communicating with the engine
             if let Ok(message) = self.receiver.try_recv() {
+                log_message(
+                    LogType::AsyncMessage,
+                    format!("EngineMessage Received - {:?}", message),
+                );
+
                 match message {
                     EngineMessage::MoveReceipt {
                         game_state,
@@ -88,9 +96,12 @@ impl eframe::App for App {
                             &self.settings,
                         );
 
-                        println!(
-                            "depth: {}, size: {}, memory: {}",
-                            tree_size.depth, tree_size.size, tree_size.memory
+                        log_message(
+                            LogType::EngineUpdate,
+                            format!(
+                                "Engine Update - depth: {}, size: {}, memory: {}",
+                                tree_size.depth, tree_size.size, tree_size.memory
+                            ),
                         );
                     }
                 }

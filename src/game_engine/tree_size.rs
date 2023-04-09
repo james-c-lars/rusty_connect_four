@@ -1,17 +1,18 @@
 use std::{
     cell::RefCell,
+    cmp::max,
     mem::size_of,
     rc::{Rc, Weak},
 };
 
 use crate::game_engine::{
     board_state::{BoardState, ChildState},
-    transposition::TranspositionTable,
+    layer_generator::LayerGenerator,
 };
 
 /// Contains different numerical details about the size of a
 /// decision tree.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct TreeSize {
     pub depth: usize,
     pub size: usize,
@@ -19,32 +20,12 @@ pub struct TreeSize {
 }
 
 /// Calculates numerical details about a decision tree.
-pub fn calculate_size(root: Rc<RefCell<BoardState>>, table: &TranspositionTable) -> TreeSize {
+pub fn calculate_size(root: Rc<RefCell<BoardState>>, generator: &LayerGenerator) -> TreeSize {
     let mut depth = 0;
     let mut size = 0;
-
-    let mut current_layer = vec![root];
-    let mut next_layer = Vec::new();
-
-    while let Some(current_node) = current_layer.pop() {
-        size += 1;
-        next_layer.extend(
-            current_node
-                .borrow()
-                .children
-                .iter()
-                .map(|n| n.state.clone()),
-        );
-
-        if current_layer.len() == 0 {
-            current_layer = next_layer;
-            next_layer = Vec::new();
-            depth += 1;
-        }
-    }
-
     let mut memory = 0;
-    for (_, weak_ref) in table.iter() {
+
+    for (_, weak_ref) in generator.table_ref().iter() {
         // Size of the reference in the table
         memory += size_of::<u64>(); // key
         memory += size_of::<Weak<RefCell<BoardState>>>(); // value
@@ -52,13 +33,19 @@ pub fn calculate_size(root: Rc<RefCell<BoardState>>, table: &TranspositionTable)
         // Size of the reference as a child
         if weak_ref.strong_count() > 0 {
             memory += size_of::<BoardState>();
-
             memory += size_of::<ChildState>() * weak_ref.strong_count();
+
+            size += weak_ref.strong_count();
+
+            let current_depth = weak_ref.upgrade().unwrap().borrow().get_depth();
+            depth = max(current_depth, depth);
         }
     }
 
+    size -= generator.buffer_size();
+
     TreeSize {
-        depth,
+        depth: (depth - root.borrow().get_depth() + 1) as usize,
         size,
         memory,
     }
@@ -93,16 +80,56 @@ mod tests {
             generator.next();
         }
 
-        let stats = calculate_size(root.clone(), generator.table_ref());
+        let stats = calculate_size(root.clone(), &generator);
 
-        assert_eq!(stats.depth, 4);
-        assert_eq!(stats.size, (1 + 6 + 36 + 216));
+        let (depth, size) = calculate_from_root(root.clone());
+        assert_eq!(stats.depth, depth);
+        assert!(
+            stats.size < size,
+            "calculated: {}, manually: {}",
+            stats.size,
+            size
+        );
 
-        generator.next();
+        for _ in 0..1000 {
+            generator.next();
+        }
 
-        let stats = calculate_size(root.clone(), generator.table_ref());
+        let stats = calculate_size(root.clone(), &generator);
 
-        assert_eq!(stats.depth, 5);
-        assert_eq!(stats.size, (1 + 6 + 36 + 216) + 6);
+        let (depth, size) = calculate_from_root(root.clone());
+        assert_eq!(stats.depth, depth);
+        assert!(
+            stats.size < size,
+            "calculated: {}, manually: {}",
+            stats.size,
+            size
+        );
+    }
+
+    fn calculate_from_root(root: Rc<RefCell<BoardState>>) -> (usize, usize) {
+        let mut current_layer = vec![root];
+        let mut next_layer = Vec::new();
+
+        let mut size = 0;
+        let mut depth = 0;
+        while let Some(current_node) = current_layer.pop() {
+            size += 1;
+            next_layer.extend(
+                current_node
+                    .borrow()
+                    .children
+                    .iter()
+                    .map(|n| n.state.clone()),
+            );
+
+            if current_layer.len() == 0 {
+                current_layer = next_layer;
+                next_layer = Vec::new();
+                depth += 1;
+            }
+        }
+
+        (depth, size)
     }
 }
