@@ -28,11 +28,57 @@ impl IsFlipped {
 /// A table with weak references to every board state that has been created. Will consider symmetrical board
 /// states to be the same.
 #[derive(Default, Debug)]
-pub struct TranspositionTable {
-    table: HashMap<u64, Weak<RefCell<BoardState>>>,
+pub struct TranspositionTable<T> {
+    table: HashMap<u64, T>,
 }
 
-impl TranspositionTable {
+/// Used to get the normal hash of a board.
+fn normal_hash(board: &Board) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    board.iter().collect::<Vec<u8>>().hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Used to get the hash of a flipped board.
+fn flipped_hash(board: &Board) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    board.flipped_iter().collect::<Vec<u8>>().hash(&mut hasher);
+    hasher.finish()
+}
+
+impl<T> TranspositionTable<T> {
+    /// Gets a value in the table corresponding to a board.
+    pub fn get_transposed(&mut self, board: &Board) -> Option<(&T, IsFlipped)> {
+        let normal = normal_hash(&board);
+        if let Some(value) = self.table.get(&normal) {
+            return Some((value, IsFlipped::Normal));
+        }
+
+        let flipped = flipped_hash(&board);
+        if let Some(value) = self.table.get(&flipped) {
+            return Some((value, IsFlipped::Flipped));
+        }
+
+        None
+    }
+
+    /// Inserts a key value pair into the transposition table.
+    pub fn insert(&mut self, board: &Board, value: T) {
+        self.table.insert(normal_hash(board), value);
+    }
+
+    /// Gets an iterator to the contents of the transposition table.
+    pub fn iter(&self) -> impl Iterator<Item = (&u64, &T)> + '_ {
+        self.table.iter()
+    }
+
+    /// Gets how many entries are in the table.
+    pub fn len(&self) -> usize {
+        self.table.len()
+    }
+}
+
+impl TranspositionTable<Weak<RefCell<BoardState>>> {
     /// Using a board, gets a corresponding BoardState transposition.
     ///
     /// The IsFlipped return value represents whether the returned transposition is horizontally flipped.
@@ -41,11 +87,7 @@ impl TranspositionTable {
         board: Board,
         turn: bool,
     ) -> (Rc<RefCell<BoardState>>, IsFlipped) {
-        // First check for the non-flipped board
-        let mut hasher = DefaultHasher::new();
-        board.iter().collect::<Vec<u8>>().hash(&mut hasher);
-        let normal_hash = hasher.finish();
-        if let Some(board_state_weak) = self.table.get(&normal_hash) {
+        if let Some((board_state_weak, is_flipped)) = self.get_transposed(&board) {
             if let Some(board_state) = board_state_weak.upgrade() {
                 assert_eq!(
                     board_state.borrow().get_turn(),
@@ -56,32 +98,14 @@ impl TranspositionTable {
                     board_state.borrow()
                 );
 
-                return (board_state, IsFlipped::Normal);
-            }
-        }
-
-        // Next we can check for the flipped board
-        let mut hasher = DefaultHasher::new();
-        board.flipped_iter().collect::<Vec<u8>>().hash(&mut hasher);
-        let flipped_hash = hasher.finish();
-        if let Some(board_state_weak) = self.table.get(&flipped_hash) {
-            if let Some(board_state) = board_state_weak.upgrade() {
-                assert_eq!(
-                    board_state.borrow().get_turn(),
-                    turn,
-                    "board: {:?} turn: {} doesn't match turn of {:?}",
-                    board,
-                    turn,
-                    board_state.borrow()
-                );
-
-                return (board_state, IsFlipped::Flipped);
+                return (board_state, is_flipped);
             }
         }
 
         // The board we're evaluating is not in the Transposition table, so construct a new BoardState
         let board_state = Rc::new(RefCell::new(BoardState::new(board, turn)));
-        self.table.insert(normal_hash, Rc::downgrade(&board_state));
+        let normal = normal_hash(&board_state.borrow().board);
+        self.table.insert(normal, Rc::downgrade(&board_state));
 
         (board_state, IsFlipped::Normal)
     }
@@ -89,16 +113,6 @@ impl TranspositionTable {
     /// Removes unreachable board states from the transposition table.
     pub fn clean(&mut self) {
         self.table.retain(|_, r| r.strong_count() != 0);
-    }
-
-    /// Gets an iterator to the contents of the transposition table.
-    pub fn iter(&self) -> impl Iterator<Item = (&u64, &Weak<RefCell<BoardState>>)> + '_ {
-        self.table.iter()
-    }
-
-    /// Gets how many entries are in the table.
-    pub fn len(&self) -> usize {
-        self.table.len()
     }
 }
 

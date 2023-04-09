@@ -134,14 +134,6 @@ impl Board {
 
         position
     }
-
-    /// Constructs a default empty board.
-    pub const fn default_const() -> Board {
-        Board {
-            column_heights: [0; BOARD_WIDTH as usize],
-            column_bitmaps: [0; BOARD_WIDTH as usize],
-        }
-    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::{Rc, Weak}};
 
 use crate::{
     consts::BOARD_WIDTH,
@@ -67,7 +67,7 @@ impl BoardState {
     /// Populates the children vector with new BoardStates.
     pub fn generate_children(
         &mut self,
-        table: &mut TranspositionTable,
+        table: &mut TranspositionTable<Weak<RefCell<BoardState>>>,
     ) -> Vec<Rc<RefCell<BoardState>>> {
         // If this BoardState has an already won game, no children are generated
         match self.is_game_over() {

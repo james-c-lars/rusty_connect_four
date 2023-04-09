@@ -6,7 +6,7 @@ pub enum LogType {
     Performance,
 }
 
-const TESTING: bool = false;
+const TESTING: bool = true;
 
 const ASYNC_MESSAGE: bool = false;
 const ENGINE_UPDATE: bool = true;

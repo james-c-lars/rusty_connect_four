@@ -5,13 +5,14 @@ use crate::{
     game_engine::{
         board::Board, board_state::BoardState, layer_generator::LayerGenerator,
         tree_analysis::how_good_is, tree_size::calculate_size,
+        transposition::TranspositionTable, 
     },
     log::{log_message, LogType},
 };
 
 // Reexport GameOver
 pub use crate::game_engine::{
-    transposition::TranspositionTable, tree_size::TreeSize, win_check::GameOver,
+    tree_size::TreeSize, win_check::GameOver,
 };
 
 #[derive(Debug)]
@@ -146,6 +147,7 @@ impl GameManager {
         let start = Instant::now();
 
         let mut move_scores = HashMap::new();
+        let mut score_table = TranspositionTable::<isize>::default();
 
         let borrowed_board_state = self.board_state.borrow();
         let child_iter = borrowed_board_state.children.iter();
@@ -153,10 +155,10 @@ impl GameManager {
 
         for child in child_iter {
             let child_score = if whose_turn {
-                how_good_is(&child.state.borrow())
+                how_good_is(&child.state.borrow(), &mut score_table)
             } else {
                 // Some funky handling to avoid int overflow on negating isize::MIN
-                match how_good_is(&child.state.borrow()) {
+                match how_good_is(&child.state.borrow(), &mut score_table) {
                     isize::MIN => isize::MAX,
                     isize::MAX => isize::MIN,
                     score => -score,
@@ -199,7 +201,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::game_engine::{
-        game_manager::GameManager, tree_analysis::how_good_is, win_check::GameOver,
+        game_manager::GameManager, tree_analysis::how_good_is, win_check::GameOver, transposition::TranspositionTable,
     };
 
     #[test]
@@ -235,7 +237,7 @@ mod tests {
 
         let state = manager.board_state;
 
-        assert_eq!(how_good_is(&state.borrow()), isize::MIN);
+        assert_eq!(how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()), isize::MIN);
 
         let mut manager = GameManager::start_from_position(board_array, true);
 
@@ -243,7 +245,7 @@ mod tests {
 
         let state = manager.board_state;
 
-        assert_eq!(how_good_is(&state.borrow()), 0);
+        assert_eq!(how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()), 0);
     }
 
     #[test]
