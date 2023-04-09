@@ -88,16 +88,7 @@ impl TranspositionTable {
 
     /// Removes unreachable board states from the transposition table.
     pub fn clean(&mut self) {
-        for (key, weak_ref) in self
-            .table
-            .iter()
-            .map(|(k, r)| (*k, r.clone()))
-            .collect::<Vec<(u64, Weak<RefCell<BoardState>>)>>()
-        {
-            if weak_ref.strong_count() == 0 {
-                self.table.remove(&key);
-            }
-        }
+        self.table.retain(|_, r| r.strong_count() != 0);
     }
 
     /// Gets an iterator to the contents of the transposition table.

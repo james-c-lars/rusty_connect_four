@@ -6,6 +6,8 @@ pub enum LogType {
     Performance,
 }
 
+const TESTING: bool = false;
+
 const ASYNC_MESSAGE: bool = false;
 const ENGINE_UPDATE: bool = true;
 const DETAIL: bool = false;
@@ -21,7 +23,7 @@ pub fn log_message(log_type: LogType, msg: String) {
         LogType::Performance => PERFORMANCE,
     };
 
-    if should_print {
+    if should_print && !TESTING {
         println!("{}", msg);
     }
 }

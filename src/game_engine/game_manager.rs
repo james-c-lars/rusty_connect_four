@@ -71,7 +71,7 @@ impl GameManager {
 
         log_message(
             LogType::Performance,
-            format!("Generate {} states - {}", x, start.elapsed().as_secs()),
+            format!("Generate {} states - {}", x, start.elapsed().as_secs_f32()),
         );
 
         num_generated
@@ -117,7 +117,7 @@ impl GameManager {
             .replace(self.board_state.take().narrow_possibilities(col).take());
         log_message(
             LogType::Performance,
-            format!("Make Move [Trim Tree] - {}", sub_start.elapsed().as_secs()),
+            format!("Make Move [Trim Tree] - {}", sub_start.elapsed().as_secs_f32()),
         );
 
         let sub_start = Instant::now();
@@ -126,13 +126,13 @@ impl GameManager {
             LogType::Performance,
             format!(
                 "Make Move [Restart Layer Generator] - {}",
-                sub_start.elapsed().as_secs()
+                sub_start.elapsed().as_secs_f32()
             ),
         );
 
         log_message(
             LogType::Performance,
-            format!("Make Move - {}", start.elapsed().as_secs()),
+            format!("Make Move - {}", start.elapsed().as_secs_f32()),
         );
 
         Ok(())
@@ -168,7 +168,7 @@ impl GameManager {
 
         log_message(
             LogType::Performance,
-            format!("Get Move Scores - {}", start.elapsed().as_secs()),
+            format!("Get Move Scores - {}", start.elapsed().as_secs_f32()),
         );
 
         move_scores
@@ -187,7 +187,7 @@ impl GameManager {
 
         log_message(
             LogType::Performance,
-            format!("Size - {}", start.elapsed().as_secs()),
+            format!("Size - {}", start.elapsed().as_secs_f32()),
         );
 
         to_return

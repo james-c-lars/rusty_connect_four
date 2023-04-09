@@ -79,7 +79,7 @@ impl LayerGenerator {
             LogType::Performance,
             format!(
                 "Restart Layer Generator [Clean] - {}",
-                sub_start.elapsed().as_secs()
+                sub_start.elapsed().as_secs_f32()
             ),
         );
 
@@ -90,7 +90,7 @@ impl LayerGenerator {
             LogType::Performance,
             format!(
                 "Restart Layer Generator [Get Bottom Two Layers] - {}",
-                sub_start.elapsed().as_secs()
+                sub_start.elapsed().as_secs_f32()
             ),
         );
 

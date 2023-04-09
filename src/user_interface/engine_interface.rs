@@ -53,7 +53,7 @@ pub fn async_engine_process(
 ) {
     // Setting the initial state of the process
     let mut manager = GameManager::new_game();
-    let mut memory_usage: usize = 0;
+    let mut tree_size: TreeSize = TreeSize::default();
     let mut tree_complete = false;
     let mut time_since_last_update = Instant::now();
 
@@ -63,13 +63,13 @@ pub fn async_engine_process(
             Ok(message) => Some(message),
             // Otherwise we need to choose whether to generate board states or wait
             Err(_) => {
-                if memory_usage >= MAX_MEMORY_USAGE || tree_complete {
+                if tree_size.memory >= MAX_MEMORY_USAGE || tree_complete {
                     log_message(
                         LogType::MaxMemHit,
                         format!("Max Memory Hit -  tree complete: {}", tree_complete),
                     );
 
-                    send_update(&sender, &manager, &mut memory_usage);
+                    send_update(&sender, &manager, &mut tree_size);
                     poke_main_thread(&ctx);
 
                     // If our tree is as big as we'll let it be already, we can block the thread
@@ -83,7 +83,7 @@ pub fn async_engine_process(
                     }
                 } else {
                     log_message(LogType::Detail, "Growing tree".to_owned());
-                    grow_tree(&mut manager, &mut tree_complete, &mut memory_usage);
+                    grow_tree(&mut manager, &mut tree_complete, &mut tree_size);
 
                     None
                 }
@@ -98,7 +98,7 @@ pub fn async_engine_process(
 
             match message {
                 UIMessage::MakeMove(column) => {
-                    let response = try_make_move(&mut manager, column, &mut memory_usage);
+                    let response = try_make_move(&mut manager, column, &mut tree_size);
 
                     sender.send(response).expect(
                         format!("Sending response to MakeMove({}) failed", column).as_str(),
@@ -108,11 +108,11 @@ pub fn async_engine_process(
                 }
                 UIMessage::ResetGame => {
                     manager = GameManager::new_game();
-                    memory_usage = 0;
+                    tree_size = TreeSize::default();
                     tree_complete = false;
                 }
                 UIMessage::RequestUpdate => {
-                    send_update(&sender, &manager, &mut memory_usage);
+                    send_update(&sender, &manager, &mut tree_size);
                     poke_main_thread(&ctx);
                     time_since_last_update = Instant::now();
                 }
@@ -128,7 +128,7 @@ pub fn async_engine_process(
         if time_since_last_update.elapsed().as_secs() > 1 {
             log_message(LogType::AsyncMessage, "Sending periodic update".to_owned());
 
-            send_update(&sender, &manager, &mut memory_usage);
+            send_update(&sender, &manager, &mut tree_size);
             poke_main_thread(&ctx);
 
             time_since_last_update = Instant::now();
@@ -147,17 +147,16 @@ fn poke_main_thread(ctx: &Context) {
 fn try_make_move(
     manager: &mut GameManager,
     column: usize,
-    memory_usage: &mut usize,
+    tree_size: &mut TreeSize,
 ) -> EngineMessage {
     match manager.make_move(column as u8) {
         Ok(()) => {
-            let tree_size = manager.size();
-            *memory_usage = tree_size.memory;
+            *tree_size = manager.size();
 
             EngineMessage::MoveReceipt {
                 game_state: manager.is_game_over(),
                 move_scores: manager.get_move_scores(),
-                tree_size,
+                tree_size: *tree_size,
             }
         }
         Err(error_message) => EngineMessage::InvalidMove(error_message),
@@ -165,21 +164,18 @@ fn try_make_move(
 }
 
 /// Grows the size of the decision tree.
-fn grow_tree(manager: &mut GameManager, tree_complete: &mut bool, memory_usage: &mut usize) {
+fn grow_tree(manager: &mut GameManager, tree_complete: &mut bool, tree_size: &mut TreeSize) {
     let current_generated = manager.try_generate_x_states(GENERATED_NODES_PER_ITERATION);
     *tree_complete = current_generated < GENERATED_NODES_PER_ITERATION;
-    *memory_usage = manager.size().memory;
+    *tree_size = manager.size();
 }
 
 /// Sends an update to the UI of the current engine state.
-fn send_update(sender: &Sender<EngineMessage>, manager: &GameManager, memory_usage: &mut usize) {
-    let tree_size = manager.size();
-    *memory_usage = tree_size.memory;
-
+fn send_update(sender: &Sender<EngineMessage>, manager: &GameManager, tree_size: &TreeSize) {
     sender
         .send(EngineMessage::Update {
             move_scores: manager.get_move_scores(),
-            tree_size,
+            tree_size: *tree_size,
         })
         .expect(format!("Sending update failed!").as_str());
 }
