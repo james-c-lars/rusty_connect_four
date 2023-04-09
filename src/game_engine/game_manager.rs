@@ -4,16 +4,13 @@ use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
     game_engine::{
         board::Board, board_state::BoardState, layer_generator::LayerGenerator,
-        tree_analysis::how_good_is, tree_size::calculate_size,
-        transposition::TranspositionTable, 
+        transposition::TranspositionTable, tree_analysis::how_good_is, tree_size::calculate_size,
     },
     log::{log_message, LogType},
 };
 
 // Reexport GameOver
-pub use crate::game_engine::{
-    tree_size::TreeSize, win_check::GameOver,
-};
+pub use crate::game_engine::{tree_size::TreeSize, win_check::GameOver};
 
 #[derive(Debug)]
 pub struct GameManager {
@@ -118,7 +115,10 @@ impl GameManager {
             .replace(self.board_state.take().narrow_possibilities(col).take());
         log_message(
             LogType::Performance,
-            format!("Make Move [Trim Tree] - {}", sub_start.elapsed().as_secs_f32()),
+            format!(
+                "Make Move [Trim Tree] - {}",
+                sub_start.elapsed().as_secs_f32()
+            ),
         );
 
         let sub_start = Instant::now();
@@ -201,7 +201,8 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::game_engine::{
-        game_manager::GameManager, tree_analysis::how_good_is, win_check::GameOver, transposition::TranspositionTable,
+        game_manager::GameManager, transposition::TranspositionTable, tree_analysis::how_good_is,
+        win_check::GameOver,
     };
 
     #[test]
@@ -237,7 +238,10 @@ mod tests {
 
         let state = manager.board_state;
 
-        assert_eq!(how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()), isize::MIN);
+        assert_eq!(
+            how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()),
+            isize::MIN
+        );
 
         let mut manager = GameManager::start_from_position(board_array, true);
 
@@ -245,7 +249,10 @@ mod tests {
 
         let state = manager.board_state;
 
-        assert_eq!(how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()), 0);
+        assert_eq!(
+            how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()),
+            0
+        );
     }
 
     #[test]

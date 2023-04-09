@@ -1,4 +1,10 @@
-use std::{cell::RefCell, cmp::max, collections::HashMap, rc::{Rc, Weak}, time::Instant};
+use std::{
+    cell::RefCell,
+    cmp::max,
+    collections::HashMap,
+    rc::{Rc, Weak},
+    time::Instant,
+};
 
 use crate::{
     game_engine::{
