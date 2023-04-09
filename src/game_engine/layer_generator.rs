@@ -1,7 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, cmp::max, collections::HashMap, rc::Rc, time::Instant};
 
-use crate::game_engine::{
-    board_state::BoardState, transposition::TranspositionTable, win_check::GameOver,
+use crate::{
+    game_engine::{
+        board_state::BoardState, transposition::TranspositionTable, win_check::GameOver,
+    },
+    log::{log_message, LogType},
 };
 
 /// Iterator used to generate a BoardState decision tree. Each iteration will
@@ -51,8 +54,10 @@ impl LayerGenerator {
     }
 
     /// Constructs a new LayerGenerator for a given BoardState.
-    pub fn new(board: Rc<RefCell<BoardState>>, table: TranspositionTable) -> LayerGenerator {
-        let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
+    pub fn new(table: TranspositionTable) -> LayerGenerator {
+        assert_ne!(table.len(), 0);
+
+        let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(&table);
 
         LayerGenerator {
             generation_1: previous_generation,
@@ -62,18 +67,36 @@ impl LayerGenerator {
         }
     }
 
-    /// Restarts the LayerGeneration process, using a new root for the decision tree.
-    pub fn restart(&mut self, board: Rc<RefCell<BoardState>>) {
-        let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(board);
+    /// Restarts the LayerGeneration process, rescanning the tranposition table.
+    pub fn restart(&mut self) {
+        let sub_start = Instant::now();
+        // In order to determine which leaves aren't in use we need to remove our own
+        //  references to them.
+        self.generation_1.clear();
+        self.generation_2.clear();
+        self.table.clean();
+        log_message(
+            LogType::Performance,
+            format!(
+                "Restart Layer Generator [Clean] - {}",
+                sub_start.elapsed().as_secs()
+            ),
+        );
+
+        let sub_start = Instant::now();
+        let (previous_generation, new_generation) =
+            LayerGenerator::get_bottom_two_layers(&self.table);
+        log_message(
+            LogType::Performance,
+            format!(
+                "Restart Layer Generator [Get Bottom Two Layers] - {}",
+                sub_start.elapsed().as_secs()
+            ),
+        );
 
         self.generation_1 = previous_generation;
         self.generation_2 = new_generation;
         self.generation_1_is_new = false;
-    }
-
-    /// Cleans unreachable nodes from the transposition table.
-    pub fn clean_transposition_table(&mut self) {
-        self.table.clean();
     }
 
     /// Finds the BoardStates at the bottom of the decision tree and returns
@@ -83,58 +106,51 @@ impl LayerGenerator {
     ///
     /// Returns a tuple of (previous_generation, new_generation).
     fn get_bottom_two_layers(
-        board: Rc<RefCell<BoardState>>,
+        table: &TranspositionTable,
     ) -> (Vec<Rc<RefCell<BoardState>>>, Vec<Rc<RefCell<BoardState>>>) {
-        // bottom_layers will contain all games that still need children generated
-        // This should only consist of one or two distinct generations
-        // We can separate the generations via whose turn it is
-        let mut bottom_layers: [Vec<Rc<RefCell<BoardState>>>; 2] = [Vec::new(), Vec::new()];
+        let mut depth_sorted_nodes: HashMap<u8, Vec<Rc<RefCell<BoardState>>>> = HashMap::new();
+        let mut max_depth = 0;
 
-        // to_explore is a stack of all the nodes left to explore as we search for the
-        //  bottom
-        let mut to_explore: Vec<Rc<RefCell<BoardState>>> = vec![board];
+        for (_, weak_ref) in table.iter() {
+            if let Some(board_state) = weak_ref.upgrade() {
+                if board_state.borrow().children.len() > 0
+                    || board_state.borrow().is_game_over() != GameOver::NoWin
+                {
+                    continue;
+                }
 
-        // While our exploration stack still has nodes
-        while let Some(curr_state) = to_explore.pop() {
-            // If the node already has had its children generated
-            if curr_state.borrow().children.len() > 0 {
-                // Add the children to the stack to be explored
-                to_explore.extend(curr_state.borrow().children.iter().map(|c| c.state.clone()));
-            } else if curr_state.borrow().is_game_over() == GameOver::NoWin {
-                // Otherwise, if the node isn't a dead end (already won)
-                // Add the node to our list of nodes that need children generated
-                bottom_layers[curr_state.borrow().get_turn() as usize].push(curr_state.clone());
+                let current_depth = board_state.borrow().get_depth();
+                max_depth = max(current_depth, max_depth);
+
+                if current_depth == max_depth || current_depth + 1 == max_depth {
+                    if let Some(depth_array) = depth_sorted_nodes.get_mut(&current_depth) {
+                        depth_array.push(board_state);
+                    } else {
+                        depth_sorted_nodes.insert(current_depth, vec![board_state]);
+                    }
+                }
             }
         }
 
-        let [false_layer, true_layer] = bottom_layers;
+        let mut previous_generation;
+        let mut new_generation;
+        if max_depth > 0 {
+            previous_generation = depth_sorted_nodes
+                .remove(&(max_depth - 1))
+                .unwrap_or(Vec::new());
+            new_generation = depth_sorted_nodes.remove(&max_depth).unwrap();
 
-        // Now we want to determine which of our two generations is the newest
-        // We can do this by finding the depth of each layer and then comparing them
-        // The depth of each node in a generation should be the same, so we'll check
-        //  an arbitrary node from each generation to compare
-
-        // First we need to make sure there's even a node in each generation to compare
-        if false_layer.len() > 0 && true_layer.len() > 0 {
-            // Then we can calculate the depth
-            let false_depth = false_layer[0].borrow().get_depth();
-            let true_depth = true_layer[0].borrow().get_depth();
-
-            if false_depth < true_depth {
-                (false_layer, true_layer)
-            } else {
-                (true_layer, false_layer)
+            if previous_generation.len() == 0 {
+                previous_generation = new_generation;
+                new_generation = Vec::new();
             }
         } else {
-            // Otherwise just return the layers based on which one actually has nodes
-            if false_layer.len() > 0 {
-                (false_layer, true_layer)
-            } else {
-                (true_layer, false_layer)
-            }
-            // And in the worst case we'll be returning two empty vectors which
-            //  is fine
+            // Max Depth = 0 when starting a new game or at the end of a game
+            previous_generation = depth_sorted_nodes.remove(&max_depth).unwrap_or(Vec::new());
+            new_generation = Vec::new();
         }
+
+        (previous_generation, new_generation)
     }
 }
 
@@ -247,8 +263,10 @@ mod tests {
 
     #[test]
     fn get_bottom_two_layers() {
-        let board_state = Rc::new(RefCell::new(BoardState::default()));
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
+        let mut table = TranspositionTable::default();
+        let (root, _) = table.get_board_state(Board::default(), false);
+
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(&table);
 
         assert_eq!(previous.len(), 1);
         assert_eq!(new.len(), 0);
@@ -257,7 +275,7 @@ mod tests {
             generation_1: previous,
             generation_2: new,
             generation_1_is_new: false,
-            table: TranspositionTable::default(),
+            table,
         };
         layer_generator.next();
 
@@ -267,9 +285,9 @@ mod tests {
             BOARD_WIDTH as usize
         );
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(&layer_generator.table);
 
-        assert_eq!(previous.len(), BOARD_WIDTH as usize);
+        assert_eq!(previous.len(), (BOARD_WIDTH / 2 + 1) as usize);
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
@@ -278,7 +296,7 @@ mod tests {
             generation_1_is_new: false,
             table: layer_generator.table,
         };
-        for _ in 0..7 {
+        for _ in 0..(BOARD_WIDTH / 2 + 1) {
             layer_generator.next();
         }
 
@@ -288,9 +306,9 @@ mod tests {
             (BOARD_WIDTH * 4) as usize
         );
 
-        let (previous, new) = LayerGenerator::get_bottom_two_layers(board_state.clone());
+        let (previous, new) = LayerGenerator::get_bottom_two_layers(&layer_generator.table);
 
-        assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH) as usize);
+        assert_eq!(previous.len(), (BOARD_WIDTH * BOARD_WIDTH / 2 + 1) as usize);
         assert_eq!(new.len(), 0);
 
         let mut layer_generator = LayerGenerator {
@@ -317,6 +335,8 @@ mod tests {
         }
 
         assert_eq!(previous_depth + 1, new_depth);
+
+        drop(root);
     }
 
     #[test]
@@ -330,11 +350,14 @@ mod tests {
             [2, 2, 1, 1, 2, 1, 2],
         ]);
 
-        let root = Rc::new(RefCell::new(BoardState::new(board, true)));
+        let mut table = TranspositionTable::default();
+        let (root, _) = table.get_board_state(board, true);
 
-        let mut generator = LayerGenerator::new(root, TranspositionTable::default());
+        let mut generator = LayerGenerator::new(table);
 
         assert_eq!(generator.next(), Some(1));
+
+        drop(root);
 
         let board = Board::from_arrays([
             [0, 0, 0, 0, 0, 0, 2],
@@ -345,13 +368,16 @@ mod tests {
             [0, 0, 0, 0, 0, 0, 1],
         ]);
 
-        let root = Rc::new(RefCell::new(BoardState::new(board, true)));
+        let mut table = TranspositionTable::default();
+        let (root, _) = table.get_board_state(board, true);
 
-        let mut generator = LayerGenerator::new(root, TranspositionTable::default());
+        let mut generator = LayerGenerator::new(table);
 
         for _ in 0..(7 + 49 + 343) {
             let num_generated = generator.next().unwrap();
             assert!(num_generated == 6 || num_generated == 0);
         }
+
+        drop(root);
     }
 }

@@ -23,11 +23,12 @@ pub struct GameManager {
 impl GameManager {
     /// Starts a new game with an empty board.
     pub fn new_game() -> GameManager {
-        let state: Rc<RefCell<BoardState>> = RefCell::new(Default::default()).into();
+        let mut table = TranspositionTable::default();
+        let (state, _) = table.get_board_state(Board::default(), false);
 
         GameManager {
-            board_state: state.clone(),
-            layer_generator: LayerGenerator::new(state, TranspositionTable::default()),
+            board_state: state,
+            layer_generator: LayerGenerator::new(table),
         }
     }
 
@@ -38,12 +39,12 @@ impl GameManager {
         position: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
         turn: bool,
     ) -> GameManager {
-        let state: Rc<RefCell<BoardState>> =
-            RefCell::new(BoardState::new(Board::from_arrays(position), turn)).into();
+        let mut table = TranspositionTable::default();
+        let (state, _) = table.get_board_state(Board::from_arrays(position), turn);
 
         GameManager {
-            board_state: state.clone(),
-            layer_generator: LayerGenerator::new(state, TranspositionTable::default()),
+            board_state: state,
+            layer_generator: LayerGenerator::new(table),
         }
     }
 
@@ -120,17 +121,13 @@ impl GameManager {
         );
 
         let sub_start = Instant::now();
-        self.layer_generator.restart(self.board_state.clone());
+        self.layer_generator.restart();
         log_message(
             LogType::Performance,
-            format!("Make Move [Restart Layer Generator] - {}", sub_start.elapsed().as_secs()),
-        );
-
-        let sub_start = Instant::now();
-        self.layer_generator.clean_transposition_table();
-        log_message(
-            LogType::Performance,
-            format!("Make Move [Clean Transposition Table] - {}", sub_start.elapsed().as_secs()),
+            format!(
+                "Make Move [Restart Layer Generator] - {}",
+                sub_start.elapsed().as_secs()
+            ),
         );
 
         log_message(
@@ -194,18 +191,6 @@ impl GameManager {
         );
 
         to_return
-    }
-
-    /// Cleans unreachable nodes from the transposition table.
-    pub fn clean_transposition_table(&mut self) {
-        let start = Instant::now();
-
-        self.layer_generator.clean_transposition_table();
-
-        log_message(
-            LogType::Performance,
-            format!("Clean Transposition Table - {}", start.elapsed().as_secs()),
-        );
     }
 }
 

@@ -65,15 +65,10 @@ impl BoardState {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        cell::RefCell,
-        isize::{MAX, MIN},
-        rc::Rc,
-    };
+    use std::isize::{MAX, MIN};
 
     use crate::game_engine::{
-        board::Board, board_state::BoardState, layer_generator::LayerGenerator,
-        transposition::TranspositionTable,
+        board::Board, layer_generator::LayerGenerator, transposition::TranspositionTable,
     };
 
     use super::how_good_is;
@@ -89,8 +84,9 @@ mod tests {
             [0, 1, 1, 1, 0, 0, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, false)));
-        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
+        let mut table = TranspositionTable::default();
+        let (board_state, _) = table.get_board_state(board, false);
+        let mut generator = LayerGenerator::new(table);
 
         for _ in 0..1000 {
             generator.next();
@@ -107,8 +103,9 @@ mod tests {
             [0, 1, 1, 0, 2, 2, 1],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, true)));
-        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
+        let mut table = TranspositionTable::default();
+        let (board_state, _) = table.get_board_state(board, true);
+        let mut generator = LayerGenerator::new(table);
 
         for _ in 0..1000 {
             generator.next();
@@ -126,8 +123,9 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, false)));
-        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
+        let mut table = TranspositionTable::default();
+        let (board_state, _) = table.get_board_state(board, false);
+        let mut generator = LayerGenerator::new(table);
 
         for _ in 0..1000 {
             generator.next();
@@ -144,8 +142,9 @@ mod tests {
             [2, 1, 2, 1, 2, 1, 0],
         ]);
 
-        let board_state = Rc::new(RefCell::new(BoardState::new(board, true)));
-        let mut generator = LayerGenerator::new(board_state.clone(), TranspositionTable::default());
+        let mut table = TranspositionTable::default();
+        let (board_state, _) = table.get_board_state(board, true);
+        let mut generator = LayerGenerator::new(table);
 
         for _ in 0..1000 {
             generator.next();

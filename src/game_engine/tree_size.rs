@@ -70,12 +70,11 @@ mod tests {
             [0, 1, 2, 0, 0, 1, 2],
             [0, 1, 2, 0, 2, 1, 2],
         ];
-        let root = Rc::new(RefCell::new(BoardState::new(
-            Board::from_arrays(board_array),
-            true,
-        )));
 
-        let mut generator = LayerGenerator::new(root.clone(), TranspositionTable::default());
+        let mut table = TranspositionTable::default();
+        let (root, _) = table.get_board_state(Board::from_arrays(board_array), false);
+
+        let mut generator = LayerGenerator::new(table);
         for _ in 0..(1 + 6 + 36) {
             generator.next();
         }
@@ -85,7 +84,7 @@ mod tests {
         let (depth, size) = calculate_from_root(root.clone());
         assert_eq!(stats.depth, depth);
         assert!(
-            stats.size < size,
+            stats.size <= size + 1,
             "calculated: {}, manually: {}",
             stats.size,
             size

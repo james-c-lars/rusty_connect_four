@@ -104,6 +104,11 @@ impl TranspositionTable {
     pub fn iter(&self) -> impl Iterator<Item = (&u64, &Weak<RefCell<BoardState>>)> + '_ {
         self.table.iter()
     }
+
+    /// Gets how many entries are in the table.
+    pub fn len(&self) -> usize {
+        self.table.len()
+    }
 }
 
 #[cfg(test)]
