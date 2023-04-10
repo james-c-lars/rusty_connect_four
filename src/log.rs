@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 pub enum LogType {
     AsyncMessage,
     EngineUpdate,
@@ -25,5 +27,26 @@ pub fn log_message(log_type: LogType, msg: String) {
 
     if should_print && !TESTING {
         println!("{}", msg);
+    }
+}
+
+pub struct PerfTimer {
+    start: Instant,
+    label: String,
+}
+
+impl PerfTimer {
+    pub fn start(label: &str) -> PerfTimer {
+        PerfTimer {
+            start: Instant::now(),
+            label: label.to_owned(),
+        }
+    }
+
+    pub fn stop(&self) {
+        log_message(
+            LogType::Performance,
+            format!("{} - {}", self.label, self.start.elapsed().as_secs_f32()),
+        );
     }
 }

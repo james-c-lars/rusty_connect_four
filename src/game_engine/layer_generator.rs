@@ -3,14 +3,13 @@ use std::{
     cmp::max,
     collections::HashMap,
     rc::{Rc, Weak},
-    time::Instant,
 };
 
 use crate::{
     game_engine::{
         board_state::BoardState, transposition::TranspositionTable, win_check::GameOver,
     },
-    log::{log_message, LogType},
+    log::PerfTimer,
 };
 
 /// Iterator used to generate a BoardState decision tree. Each iteration will
@@ -75,30 +74,18 @@ impl LayerGenerator {
 
     /// Restarts the LayerGeneration process, rescanning the tranposition table.
     pub fn restart(&mut self) {
-        let sub_start = Instant::now();
+        let timer = PerfTimer::start("Restart Layer Generator [Clean]");
         // In order to determine which leaves aren't in use we need to remove our own
         //  references to them.
         self.generation_1.clear();
         self.generation_2.clear();
         self.table.clean();
-        log_message(
-            LogType::Performance,
-            format!(
-                "Restart Layer Generator [Clean] - {}",
-                sub_start.elapsed().as_secs_f32()
-            ),
-        );
+        timer.stop();
 
-        let sub_start = Instant::now();
+        let timer = PerfTimer::start("Restart Layer Generator [Get Bottom Two Layers]");
         let (previous_generation, new_generation) =
             LayerGenerator::get_bottom_two_layers(&self.table);
-        log_message(
-            LogType::Performance,
-            format!(
-                "Restart Layer Generator [Get Bottom Two Layers] - {}",
-                sub_start.elapsed().as_secs_f32()
-            ),
-        );
+        timer.stop();
 
         self.generation_1 = previous_generation;
         self.generation_2 = new_generation;
