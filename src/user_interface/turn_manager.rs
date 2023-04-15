@@ -46,11 +46,15 @@ pub struct TurnManager {
 impl TurnManager {
     /// Creates a new TurnManager.
     pub fn new(players: [PlayerType; 2]) -> TurnManager {
+        let current_player_type = players[0];
         TurnManager {
             current_player: PieceState::PlayerOne,
-            current_player_type: players[0],
+            current_player_type,
             // We're assuming the first player to go is a human by default
-            stage: TurnStage::WaitingForMoveReceipt,
+            stage: match current_player_type {
+                PlayerType::Human => TurnStage::WaitingForMoveReceipt,
+                PlayerType::Computer => TurnStage::Delay { start: Instant::now(), animating_to_column: 6 },
+            },
         }
     }
 

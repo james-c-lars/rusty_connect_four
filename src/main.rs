@@ -10,7 +10,7 @@ use rusty_connect_four::{
     user_interface::{
         board::Board,
         engine_interface::{async_engine_process, EngineMessage, TreeSize, UIMessage},
-        settings::Settings,
+        settings::{Settings, PlayerType},
         turn_manager::TurnManager,
     },
 };
@@ -42,9 +42,13 @@ impl App {
         // Other set-up
         let settings = Settings::new();
         let turn_manager = TurnManager::new(settings.players);
+        let mut board = Board::new(Id::new("Board"), Pos2 { x: 0.0, y: 0.0 });
+        if settings.players[0] == PlayerType::Computer {
+            board.lock();
+        }
 
         Self {
-            board: Board::new(Id::new("Board"), Pos2 { x: 0.0, y: 0.0 }),
+            board,
             sender: my_sender,
             receiver: my_receiver,
             settings,
