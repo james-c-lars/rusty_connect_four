@@ -10,7 +10,7 @@ use rusty_connect_four::{
     user_interface::{
         board::Board,
         engine_interface::{async_engine_process, EngineMessage, TreeSize, UIMessage},
-        settings::{Settings, PlayerType},
+        settings::{PlayerType, Settings},
         turn_manager::TurnManager,
     },
 };
@@ -23,7 +23,7 @@ pub struct App {
     settings: Settings,
     turn_manager: TurnManager,
     tree_size: TreeSize,
-    move_scores: HashMap<u8, isize>,
+    move_scores: HashMap<u8, f32>,
 }
 
 impl App {

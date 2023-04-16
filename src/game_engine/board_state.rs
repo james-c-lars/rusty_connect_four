@@ -1,13 +1,14 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use crate::{
     consts::BOARD_WIDTH,
     game_engine::{
         board::{Board, FullColumn},
-        transposition::{IsFlipped, TranspositionTable},
+        monte_carlo::RolloutResults,
+        transposition::{IsFlipped, TranspositionStateTable},
         win_check::{is_game_over, GameOver},
     },
 };
@@ -50,6 +51,7 @@ impl ChildState {
 pub struct BoardState {
     pub board: Board,
     pub children: Vec<ChildState>,
+    pub rollout_results: RolloutResults,
     turn: bool,
     game_over: GameOver,
 }
@@ -64,18 +66,19 @@ impl BoardState {
             children: Vec::new(),
             turn,
             game_over,
+            rollout_results: RolloutResults::default(),
         }
     }
 
     /// Populates the children vector with new BoardStates.
     pub fn generate_children(
         &mut self,
-        table: &mut TranspositionTable<Weak<RefCell<BoardState>>>,
+        table: &mut TranspositionStateTable,
     ) -> Vec<Rc<RefCell<BoardState>>> {
         // If this BoardState has an already won game, no children are generated
         match self.is_game_over() {
             GameOver::NoWin => (),
-            _ => return self.children.iter().map(|c| c.state.clone()).collect(),
+            _ => return Vec::new(),
         }
 
         // Children can be already generated if a different transposition calulated them

@@ -7,7 +7,7 @@ use std::{
 
 use crate::game_engine::{
     board_state::{BoardState, ChildState},
-    layer_generator::LayerGenerator,
+    transposition::TranspositionStateTable,
 };
 
 /// Contains different numerical details about the size of a
@@ -20,12 +20,12 @@ pub struct TreeSize {
 }
 
 /// Calculates numerical details about a decision tree.
-pub fn calculate_size(root: Rc<RefCell<BoardState>>, generator: &LayerGenerator) -> TreeSize {
+pub fn calculate_size(root: Rc<RefCell<BoardState>>, table: &TranspositionStateTable) -> TreeSize {
     let mut depth = 0;
     let mut size = 0;
     let mut memory = 0;
 
-    for (_, weak_ref) in generator.table_ref().iter() {
+    for (_, weak_ref) in table.iter() {
         // Size of the reference in the table
         memory += size_of::<u64>(); // key
         memory += size_of::<Weak<RefCell<BoardState>>>(); // value
@@ -41,8 +41,6 @@ pub fn calculate_size(root: Rc<RefCell<BoardState>>, generator: &LayerGenerator)
             depth = max(current_depth, depth);
         }
     }
-
-    size -= generator.buffer_size();
 
     TreeSize {
         depth: (depth - root.borrow().get_depth() + 1) as usize,
@@ -79,7 +77,7 @@ mod tests {
             generator.next();
         }
 
-        let stats = calculate_size(root.clone(), &generator);
+        let stats = calculate_size(root.clone(), generator.table_ref());
 
         let (depth, size) = calculate_from_root(root.clone());
         assert_eq!(stats.depth, depth);
@@ -94,7 +92,7 @@ mod tests {
             generator.next();
         }
 
-        let stats = calculate_size(root.clone(), &generator);
+        let stats = calculate_size(root.clone(), generator.table_ref());
 
         let (depth, size) = calculate_from_root(root.clone());
         assert_eq!(stats.depth, depth);

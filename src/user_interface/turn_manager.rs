@@ -53,7 +53,10 @@ impl TurnManager {
             // We're assuming the first player to go is a human by default
             stage: match current_player_type {
                 PlayerType::Human => TurnStage::WaitingForMoveReceipt,
-                PlayerType::Computer => TurnStage::Delay { start: Instant::now(), animating_to_column: 6 },
+                PlayerType::Computer => TurnStage::Delay {
+                    start: Instant::now(),
+                    animating_to_column: 6,
+                },
             },
         }
     }
@@ -128,7 +131,7 @@ impl TurnManager {
     /// Alerts the Turn Manager that the computer has sent an update.
     pub fn update_received(
         &mut self,
-        move_scores: &HashMap<u8, isize>,
+        move_scores: &HashMap<u8, f32>,
         ctx: &Context,
         board: &mut Board,
         settings: &Settings,
@@ -213,7 +216,7 @@ fn passively_animate_floater(ctx: &Context, board: &mut Board, animating_to_colu
 }
 
 /// Chooses a move based on the difficulty setting and the engine's move scores.
-fn choose_computer_move(move_scores: &HashMap<u8, isize>, settings: &Settings) -> usize {
+fn choose_computer_move(move_scores: &HashMap<u8, f32>, settings: &Settings) -> usize {
     if move_scores.len() == 0 {
         panic!("Trying to pick a move when no moves are valid");
     }
@@ -222,8 +225,8 @@ fn choose_computer_move(move_scores: &HashMap<u8, isize>, settings: &Settings) -
     let mut sorted_moves = move_scores
         .iter()
         .map(|(column, score)| (*score, *column))
-        .collect::<Vec<(isize, u8)>>();
-    sorted_moves.sort();
+        .collect::<Vec<(f32, u8)>>();
+    sorted_moves.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
 
     match settings.difficulty {
         Difficulty::Easy => easy_choose_move(sorted_moves) as usize,
@@ -235,7 +238,7 @@ fn choose_computer_move(move_scores: &HashMap<u8, isize>, settings: &Settings) -
 /// Picks one of the moves in the sorted_moves Vector.
 ///
 /// Higher rated moves are more likely to be picked.
-fn easy_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
+fn easy_choose_move(sorted_moves: Vec<(f32, u8)>) -> u8 {
     let mut weighted_moves = Vec::new();
     for (index, (_, column)) in sorted_moves.into_iter().enumerate() {
         for _ in 0..(index + 1) {
@@ -249,13 +252,13 @@ fn easy_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
 /// Picks one of the moves in the sorted_moves Vector.
 ///
 /// Higher rated moves are more likely to be picked and losing moves will not be considered.
-fn medium_choose_move(sorted_moves: Vec<(isize, u8)>) -> u8 {
+fn medium_choose_move(sorted_moves: Vec<(f32, u8)>) -> u8 {
     let backup_move = sorted_moves[0].1;
 
     let no_losing_moves = sorted_moves
         .into_iter()
-        .filter(|(score, _)| *score != isize::MIN)
-        .collect::<Vec<(isize, u8)>>();
+        .filter(|(score, _)| *score != 0.0)
+        .collect::<Vec<(f32, u8)>>();
     if no_losing_moves.len() == 0 {
         return backup_move;
     }

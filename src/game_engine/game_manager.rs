@@ -1,12 +1,17 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem::size_of, rc::Rc, time::{Instant, Duration}};
+
+use rand::thread_rng;
 
 use crate::{
     consts::{BOARD_HEIGHT, BOARD_WIDTH},
     game_engine::{
-        board::Board, board_state::BoardState, layer_generator::LayerGenerator,
-        transposition::TranspositionTable, tree_analysis::how_good_is, tree_size::calculate_size,
+        board::Board,
+        board_state::{BoardState, ChildState},
+        monte_carlo::RolloutResults,
+        transposition::TranspositionStateTable,
+        tree_size::calculate_size,
     },
-    log::PerfTimer,
+    log::{log_message, LogType, PerfTimer},
 };
 
 // Reexport GameOver
@@ -15,18 +20,29 @@ pub use crate::game_engine::{tree_size::TreeSize, win_check::GameOver};
 #[derive(Debug)]
 pub struct GameManager {
     board_state: Rc<RefCell<BoardState>>,
-    layer_generator: LayerGenerator,
+    table: TranspositionStateTable,
 }
 
 impl GameManager {
     /// Starts a new game with an empty board.
     pub fn new_game() -> GameManager {
-        let mut table = TranspositionTable::default();
+        let mut table = TranspositionStateTable::default();
         let (state, _) = table.get_board_state(Board::default(), false);
+
+        log_message(
+            LogType::SizeOfData,
+            format!(
+                "Sizes - Board: {}, Board State: {}, ChildState: {}, Rollout Results: {}",
+                size_of::<Board>(),
+                size_of::<BoardState>(),
+                size_of::<ChildState>(),
+                size_of::<RolloutResults>(),
+            ),
+        );
 
         GameManager {
             board_state: state,
-            layer_generator: LayerGenerator::new(table),
+            table,
         }
     }
 
@@ -37,12 +53,12 @@ impl GameManager {
         position: [[u8; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
         turn: bool,
     ) -> GameManager {
-        let mut table = TranspositionTable::default();
+        let mut table = TranspositionStateTable::default();
         let (state, _) = table.get_board_state(Board::from_arrays(position), turn);
 
         GameManager {
             board_state: state,
-            layer_generator: LayerGenerator::new(table),
+            table,
         }
     }
 
@@ -51,24 +67,23 @@ impl GameManager {
         self.board_state.borrow().board.to_arrays()
     }
 
-    /// Generates approximately x board states in the decision tree. Will generate less than
-    /// x board states if the decision tree is completely explored.
-    ///
-    /// Returns the number of board states generated.
-    pub fn try_generate_x_states(&mut self, x: usize) -> usize {
+    /// Explores the decision tree for x seconds. It does this by generating rollouts from
+    ///  the root of the tree.
+    /// 
+    /// x is the number of seconds to spend generating states.
+    pub fn explore_for_x_secs(&mut self, x: f32) {
         let timer = PerfTimer::start(&format!("Generate {} states", x));
-        let mut num_generated = 0;
+        let start = Instant::now();
+        let mut thread_rng = thread_rng();
+        let mut root = self.board_state.borrow_mut();
 
-        while num_generated < x {
-            if let Some(num) = self.layer_generator.next() {
-                num_generated += num;
-            } else {
-                break;
+        while start.elapsed() < Duration::from_secs_f32(x) {
+            for _ in 0..128 {
+                root.generate_rollouts(&mut self.table, &mut thread_rng);
             }
         }
 
         timer.stop();
-        num_generated
     }
 
     /// Drop a piece down the corresponding column.
@@ -82,7 +97,7 @@ impl GameManager {
 
         // We haven't yet generated the children of this board state
         if self.board_state.borrow().children.len() == 0 {
-            self.try_generate_x_states(1);
+            self.board_state.borrow_mut().generate_children(&mut self.table);
 
             if self.board_state.borrow().children.len() == 0 {
                 return Err(format!(
@@ -111,8 +126,8 @@ impl GameManager {
             .replace(self.board_state.take().narrow_possibilities(col).take());
         sub_timer.stop();
 
-        let sub_timer = PerfTimer::start("Make Move [Restart Layer Generator]");
-        self.layer_generator.restart();
+        let sub_timer = PerfTimer::start("Make Move [Clean Transposition Table]");
+        self.table.clean();
         sub_timer.stop();
 
         timer.stop();
@@ -123,30 +138,10 @@ impl GameManager {
     ///
     /// Higher scores are better for the player about to make a move,
     ///  lower scores are better for their opponent.
-    pub fn get_move_scores(&self) -> HashMap<u8, isize> {
+    pub fn get_move_scores(&self) -> HashMap<u8, f32> {
         let timer = PerfTimer::start("Get Move Scores");
 
-        let mut move_scores = HashMap::new();
-        let mut score_table = TranspositionTable::<isize>::default();
-
-        let borrowed_board_state = self.board_state.borrow();
-        let child_iter = borrowed_board_state.children.iter();
-        let whose_turn = borrowed_board_state.get_turn();
-
-        for child in child_iter {
-            let child_score = if whose_turn {
-                how_good_is(&child.state.borrow(), &mut score_table)
-            } else {
-                // Some funky handling to avoid int overflow on negating isize::MIN
-                match how_good_is(&child.state.borrow(), &mut score_table) {
-                    isize::MIN => isize::MAX,
-                    isize::MAX => isize::MIN,
-                    score => -score,
-                }
-            };
-
-            move_scores.insert(child.get_last_move(), child_score);
-        }
+        let move_scores = self.board_state.borrow().move_scores();
 
         timer.stop();
         move_scores
@@ -161,7 +156,7 @@ impl GameManager {
     pub fn size(&self) -> TreeSize {
         let timer = PerfTimer::start("Get Size");
 
-        let to_return = calculate_size(self.board_state.clone(), &self.layer_generator);
+        let to_return = calculate_size(self.board_state.clone(), &self.table);
 
         timer.stop();
         to_return
@@ -206,7 +201,7 @@ mod tests {
 
         let mut manager = GameManager::start_from_position(board_array, false);
 
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.05);
 
         let state = manager.board_state;
 
@@ -217,7 +212,7 @@ mod tests {
 
         let mut manager = GameManager::start_from_position(board_array, true);
 
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.05);
 
         let state = manager.board_state;
 
@@ -281,21 +276,21 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false);
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.05);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
-        real_move_scores.insert(5, isize::MAX);
-        real_move_scores.insert(6, 0);
+        real_move_scores.insert(5, 1.0);
+        real_move_scores.insert(6, 0.0);
         assert_eq!(move_scores, real_move_scores);
 
         let mut manager = GameManager::start_from_position(board_array, true);
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.05);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
-        real_move_scores.insert(5, 0);
-        real_move_scores.insert(6, 0);
+        real_move_scores.insert(5, 0.0);
+        real_move_scores.insert(6, 0.0);
         assert_eq!(move_scores, real_move_scores);
 
         let board_array = [
@@ -308,26 +303,26 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false);
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.25);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {
             if col == 3 {
-                assert_ne!(score, isize::MIN);
+                assert_ne!(score, 0.0);
             } else {
-                assert_eq!(score, isize::MIN);
+                assert!(score < 0.1);
             }
         }
 
         let mut manager = GameManager::start_from_position(board_array, true);
-        manager.try_generate_x_states(10000);
+        manager.explore_for_x_secs(0.25);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {
             if col == 3 {
-                assert_eq!(score, isize::MAX);
+                assert_eq!(score, 1.0);
             } else {
-                assert_ne!(score, isize::MAX);
+                assert_ne!(score, 1.0);
             }
         }
     }

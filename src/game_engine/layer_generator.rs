@@ -2,12 +2,12 @@ use std::{
     cell::RefCell,
     cmp::max,
     collections::HashMap,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use crate::{
     game_engine::{
-        board_state::BoardState, transposition::TranspositionTable, win_check::GameOver,
+        board_state::BoardState, transposition::TranspositionStateTable, win_check::GameOver,
     },
     log::PerfTimer,
 };
@@ -22,7 +22,7 @@ pub struct LayerGenerator {
     generation_1: Vec<Rc<RefCell<BoardState>>>,
     generation_2: Vec<Rc<RefCell<BoardState>>>,
     generation_1_is_new: bool,
-    table: TranspositionTable<Weak<RefCell<BoardState>>>,
+    table: TranspositionStateTable,
 }
 
 impl LayerGenerator {
@@ -54,12 +54,12 @@ impl LayerGenerator {
     }
 
     /// Returns a reference to the TranspositionTable used to generate BoardStates.
-    pub fn table_ref(&self) -> &TranspositionTable<Weak<RefCell<BoardState>>> {
+    pub fn table_ref(&self) -> &TranspositionStateTable {
         &self.table
     }
 
     /// Constructs a new LayerGenerator for a given BoardState.
-    pub fn new(table: TranspositionTable<Weak<RefCell<BoardState>>>) -> LayerGenerator {
+    pub fn new(table: TranspositionStateTable) -> LayerGenerator {
         assert_ne!(table.len(), 0);
 
         let (previous_generation, new_generation) = LayerGenerator::get_bottom_two_layers(&table);
@@ -99,7 +99,7 @@ impl LayerGenerator {
     ///
     /// Returns a tuple of (previous_generation, new_generation).
     fn get_bottom_two_layers(
-        table: &TranspositionTable<Weak<RefCell<BoardState>>>,
+        table: &TranspositionStateTable,
     ) -> (Vec<Rc<RefCell<BoardState>>>, Vec<Rc<RefCell<BoardState>>>) {
         let mut depth_sorted_nodes: HashMap<u8, Vec<Rc<RefCell<BoardState>>>> = HashMap::new();
         let mut max_depth = 0;

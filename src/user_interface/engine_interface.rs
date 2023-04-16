@@ -14,21 +14,20 @@ use crate::{
 
 /// Stores what the maximum amount of memory we will allow to be used by the engine.
 const MAX_MEMORY_USAGE: usize = 256 * 1024 * 1024;
-/// Stores how many nodes we will generate at once. Higher numbers are more
-/// performant, but makes the interface less responsive.
-const GENERATED_NODES_PER_ITERATION: usize = 128 * 1024;
+/// How long we will spend calculating moves before checking for new messages.
+const EXPLORATION_TIME: f32 = 0.5;
 
 /// Messages that the engine can send to the UI.
 #[derive(Debug)]
 pub enum EngineMessage {
     MoveReceipt {
         game_state: GameOver,
-        move_scores: HashMap<u8, isize>,
+        move_scores: HashMap<u8, f32>,
         tree_size: TreeSize,
     },
     InvalidMove(String),
     Update {
-        move_scores: HashMap<u8, isize>,
+        move_scores: HashMap<u8, f32>,
         tree_size: TreeSize,
     },
 }
@@ -83,7 +82,7 @@ pub fn async_engine_process(
                     }
                 } else {
                     log_message(LogType::Detail, "Growing tree".to_owned());
-                    grow_tree(&mut manager, &mut tree_complete, &mut tree_size);
+                    grow_tree(&mut manager, &mut tree_size);
 
                     None
                 }
@@ -164,9 +163,8 @@ fn try_make_move(
 }
 
 /// Grows the size of the decision tree.
-fn grow_tree(manager: &mut GameManager, tree_complete: &mut bool, tree_size: &mut TreeSize) {
-    let current_generated = manager.try_generate_x_states(GENERATED_NODES_PER_ITERATION);
-    *tree_complete = current_generated < GENERATED_NODES_PER_ITERATION;
+fn grow_tree(manager: &mut GameManager, tree_size: &mut TreeSize) {
+    manager.explore_for_x_secs(EXPLORATION_TIME);
     *tree_size = manager.size();
 }
 

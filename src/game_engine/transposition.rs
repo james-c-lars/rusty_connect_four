@@ -25,8 +25,8 @@ impl IsFlipped {
     }
 }
 
-/// A table with weak references to every board state that has been created. Will consider symmetrical board
-/// states to be the same.
+/// A table with values that can be accessed by using a Board. Will consider symmetrical
+///  boards to be the same.
 #[derive(Default, Debug)]
 pub struct TranspositionTable<T> {
     table: HashMap<u64, T>,
@@ -78,7 +78,11 @@ impl<T> TranspositionTable<T> {
     }
 }
 
-impl TranspositionTable<Weak<RefCell<BoardState>>> {
+/// A table with weak references to every board state that has been created. Will consider symmetrical board
+/// states to be the same.
+pub type TranspositionStateTable = TranspositionTable<Weak<RefCell<BoardState>>>;
+
+impl TranspositionStateTable {
     /// Using a board, gets a corresponding BoardState transposition.
     ///
     /// The IsFlipped return value represents whether the returned transposition is horizontally flipped.
