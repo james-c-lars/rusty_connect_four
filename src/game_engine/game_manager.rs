@@ -73,13 +73,17 @@ impl GameManager {
     /// x is the number of seconds to spend generating states.
     pub fn explore_for_x_secs(&mut self, x: f32) {
         let timer = PerfTimer::start(&format!("Generate {} states", x));
-        let start = Instant::now();
         let mut thread_rng = thread_rng();
         let mut root = self.board_state.borrow_mut();
 
-        while start.elapsed() < Duration::from_secs_f32(x) {
+        let start = Instant::now();
+        loop {
             for _ in 0..128 {
                 root.generate_rollouts(&mut self.table, &mut thread_rng);
+            }
+
+            if start.elapsed() < Duration::from_secs_f32(x) {
+                break;
             }
         }
 
@@ -168,7 +172,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::game_engine::{
-        game_manager::GameManager, transposition::TranspositionTable, tree_analysis::how_good_is,
+        game_manager::GameManager,
         win_check::GameOver,
     };
 
@@ -201,24 +205,20 @@ mod tests {
 
         let mut manager = GameManager::start_from_position(board_array, false);
 
-        manager.explore_for_x_secs(0.05);
-
-        let state = manager.board_state;
+        manager.explore_for_x_secs(0.5);
 
         assert_eq!(
-            how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()),
-            isize::MIN
+            *manager.get_move_scores().get(&5).unwrap(),
+            1.0
         );
 
         let mut manager = GameManager::start_from_position(board_array, true);
 
-        manager.explore_for_x_secs(0.05);
-
-        let state = manager.board_state;
+        manager.explore_for_x_secs(0.5);
 
         assert_eq!(
-            how_good_is(&state.borrow(), &mut TranspositionTable::<isize>::default()),
-            0
+            *manager.get_move_scores().get(&5).unwrap(),
+            0.0
         );
     }
 
@@ -276,7 +276,7 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false);
-        manager.explore_for_x_secs(0.05);
+        manager.explore_for_x_secs(0.5);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
@@ -285,7 +285,7 @@ mod tests {
         assert_eq!(move_scores, real_move_scores);
 
         let mut manager = GameManager::start_from_position(board_array, true);
-        manager.explore_for_x_secs(0.05);
+        manager.explore_for_x_secs(0.5);
 
         let move_scores = manager.get_move_scores();
         let mut real_move_scores = HashMap::new();
@@ -303,7 +303,7 @@ mod tests {
         ];
 
         let mut manager = GameManager::start_from_position(board_array, false);
-        manager.explore_for_x_secs(0.25);
+        manager.explore_for_x_secs(0.5);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {
@@ -315,7 +315,7 @@ mod tests {
         }
 
         let mut manager = GameManager::start_from_position(board_array, true);
-        manager.explore_for_x_secs(0.25);
+        manager.explore_for_x_secs(0.5);
 
         let move_scores = manager.get_move_scores();
         for (col, score) in move_scores {

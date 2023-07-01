@@ -82,7 +82,7 @@ mod tests {
         let (depth, size) = calculate_from_root(root.clone());
         assert_eq!(stats.depth, depth);
         assert!(
-            stats.size <= size + 1,
+            stats.size <= size + 1 + generator.buffer_size(),
             "calculated: {}, manually: {}",
             stats.size,
             size

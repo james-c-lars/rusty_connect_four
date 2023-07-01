@@ -25,6 +25,10 @@ pub struct RolloutResults {
 ///
 /// Equation taken from: https://en.wikipedia.org/wiki/Monte_Carlo_tree_search#Exploration_and_exploitation.
 fn upper_confidence_bound_one(parent: &RolloutResults, child: &RolloutResults) -> f32 {
+    if child.total == 0 {
+        return f32::INFINITY;
+    }
+
     let w = child.success as f32 / 2.0;
     let n = child.total as f32 / 2.0;
     let p = parent.total as f32 / 2.0;
@@ -48,6 +52,10 @@ impl BoardState {
 
     /// Does a rollout for each child of the BoardState.
     pub fn generate_rollouts(&mut self, table: &mut TranspositionStateTable, thread_rng: &mut ThreadRng) {
+        if self.children.len() == 0 {
+            self.generate_children(table);
+        }
+
         for child in self.children.iter() {
             let mut child_state = child.state.borrow_mut();
             if child_state.is_game_over() == GameOver::NoWin {
@@ -62,9 +70,8 @@ impl BoardState {
     fn selection(&mut self, table: &mut TranspositionStateTable, thread_rng: &mut ThreadRng) -> GameOver {
         // We've hit a leaf node and can begin the rollout simulation
         if self.children.len() == 0 {
-            let result = self.simulation(table, thread_rng);
-            self.update_rollout_results(result);
-            return result;
+            // Simulation will handle updating the results
+            return self.simulation(table, thread_rng);
         }
 
         let mut potential_moves: Vec<(f32, &ChildState)> = self
@@ -82,7 +89,7 @@ impl BoardState {
             .collect();
 
         // The moves with the highest UCB1 scores will be explored first
-        potential_moves.sort_by(|(one, _), (two, _)| two.partial_cmp(one).unwrap());
+        potential_moves.sort_by(|(one, _), (two, _)| one.partial_cmp(two).unwrap());
 
         let (_, move_to_explore) = potential_moves.pop().unwrap();
         let result = move_to_explore.state.borrow_mut().selection(table, thread_rng);
