@@ -107,6 +107,15 @@ impl eframe::App for App {
                                 tree_size.depth, tree_size.size, tree_size.memory
                             ),
                         );
+
+                        let mut col_score_array: Vec<(&u8, &isize)> = self.move_scores.iter().collect();
+                        col_score_array.sort();
+                        let score_array: Vec<&isize> = col_score_array.iter().map(|(_, s)| *s).collect();
+
+                        log_message(
+                            LogType::MoveScores,
+                            format!("{:?}", score_array),
+                        );
                     }
                 }
             }
